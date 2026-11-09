@@ -1,7 +1,7 @@
-name: Build Desktop App
+name: Build Desktop App with Pake
 
 on:
-  workflow_dispatch:   # Manual trigger
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,28 +13,32 @@ jobs:
             name: Windows
           - os: macos-latest
             name: macOS
-          - os: ubuntu-24.04      # Debian 12 / Ubuntu 24.04 compatible
+          - os: ubuntu-24.04
             name: Linux
 
     runs-on: ${{ matrix.os }}
     name: Build for ${{ matrix.name }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build with Pake
-        uses: tw93/Pake@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          url: "./Second_Shift.html"
-          name: "Second Shift Prologue"
-          width: "1600"
-          height: "900"
-          # Optional:
-          # icon: "./icon.png"
-          # hide-title-bar: true   # only affects macOS
+          node-version: 22
 
-      - name: Upload artifacts
+      - name: Install Pake CLI
+        run: npm install -g pake-cli
+
+      - name: Build App
+        run: |
+          pake ./Second_Shift.html \
+            --name "Second Shift Prologue" \
+            --width 1600 \
+            --height 900
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Second-Shift-${{ matrix.name }}
@@ -44,4 +48,6 @@ jobs:
             **/*.app
             **/*.deb
             **/*.AppImage
+            **/*.exe
           retention-days: 7
+          if-no-files-found: warn
