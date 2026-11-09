@@ -171,4 +171,4 @@ Rated T — tension and dread, no gore.
 
 ## Licence
 
-Source and design © Soumyajit Roy, 2026. Concept and design by Soumyajit Roy. GNU GPLv3
+Source and design © Soumyajit Roy, 2026. Concept and design by Soumyajit Roy. GNU GPLv3 Made with Sarvam.
