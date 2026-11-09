@@ -2,11 +2,23 @@
 
 **A real-time nuclear operations simulator, a social deduction game and an analogue horror story, played through one keypad.**
 
-You are a licensed reactor operator on the night shift at a fictional coastal nuclear station. Every consequential action passes through a keypad: you type `sw FW-2P OPEN`, watch the echo, and press the amber EXECUTE key. The plant does not wait for you to finish typing.
+You are a licensed reactor operator on the night shift at a fictional coastal nuclear station. Every consequential action passes through a keypad: you type `sw FW-2P OPEN`, watch the echo, and press EXECUTE.
+
+[![Play in browser](https://img.shields.io/badge/Play-Second%20Shift-8B5CF6?style=for-the-badge)](Second_Shift.html)
+[![Single-file game](https://img.shields.io/badge/Format-Single%20HTML%20file-22C55E?style=for-the-badge)](Second_Shift.html)
+[![No install required](https://img.shields.io/badge/Setup-No%20install%20needed-FF8C00?style=for-the-badge)](README.md)
+[![License](https://img.shields.io/badge/License-Copyright%20%E2%80%94%202026-DC2626?style=for-the-badge)](LICENSE)
 
 Everything ships as **one self-contained HTML file** — no build step, no dependencies, no network access. Open it and play.
 
-```
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/secondshift1.jpeg" alt="SECOND SHIFT control room interface" width="48%" />
+  <img src="screenshots/secondshift2.jpeg" alt="SECOND SHIFT reactor and annunciator view" width="48%" />
+</p>
+
+```text
 Second_Shift.html      ← the whole game, 272 KB
 ```
 
@@ -37,9 +49,9 @@ No server, no install, no internet connection required after download. It runs f
 
 The simulator models two machines that fail in opposite directions.
 
-**Kaveri Delta Unit 3** — 540 MWe pressurised heavy water reactor. Subcooled coolant at 155 bar, boron shim, two regulating rod banks, on-power refuelling through 306 channels. Stable at power, punishing to neglect, and its worst outcome is a scram and a cold start.
+**Kaveri Delta Unit 3** — 540 MWe pressurised heavy water reactor. Subcooled coolant at 155 bar, boron shim, two regulating rod banks, on-power refuelling through 306 channels. Stable at power, punishing at the limits.
 
-**Unit 4** — channel-type RBMK, graphite moderated, boiling light water. 211 individually drivable control rods among 1661 channels, a strongly positive void coefficient, and an operational reactivity margin that can be run below its own limit. Stable at full power with a healthy margin; self-destroying at low power with the rods out.
+**Unit 4** — channel-type RBMK, graphite moderated, boiling light water. 211 individually drivable control rods among 1661 channels, a strongly positive void coefficient, and an operational reactivity margin that can vanish in a single bad decision.
 
 ---
 
@@ -50,7 +62,7 @@ The simulator models two machines that fail in opposite directions.
 - **Xenon and iodine** with their own build-up and burnout, time-compressed so one real minute is one plant hour. A shutdown buys you a poison outage.
 - **Decay heat** in two groups — 6.5 % at scram, falling slowly. Why the pumps matter more than the rods after a trip.
 - **A primary energy balance** against saturation curves, steam generators or drum separators, a turbine that accelerates on pressure and locks to the grid, and a DC bus with real sources and loads.
-- **RBMK rod worth with graphite displacers** — the first 18 % of insertion adds reactivity before it removes it. Pressing AZ-5 on a core with the rods out produces a power excursion before the shutdown.
+- **RBMK rod worth with graphite displacers** — the first 18 % of insertion adds reactivity before it removes it. Pressing AZ-5 on a core with the rods out produces a power excursion before the shutdown signal is even processed.
 - **Fuel damage** from sustained overpower or over-temperature, which feeds back into containment dose and into the survey meter.
 
 ---
@@ -151,7 +163,7 @@ Stated plainly, because the failure mode of this game is being mistaken for a tr
 
 ## Disclaimer
 
-SECOND SHIFT is a fictional plant with fictional procedures, built as a game. It is **not** a training tool, **not** a simulator of any real reactor, and **not** a depiction of any real utility or station. The four story chapters are dramatised reconstructions of the public record of real accidents; they are not engineering analyses.
+SECOND SHIFT is a fictional plant with fictional procedures, built as a game. It is **not** a training tool, **not** a simulator of any real reactor, and **not** a depiction of any real utility or station.
 
 Rated T — tension and dread, no gore.
 
