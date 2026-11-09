@@ -169,12 +169,6 @@ Rated T — tension and dread, no gore.
 
 ---
 
-## Documentation
-
-- `Second_Shift_Design_Guide_v2.pdf` — the full design guide: modes, reactor physics, station, audio, story, architecture and limits.
-
----
-
 ## Licence
 
-Source and design © Soumyajit Roy, 2026. Concept and design by Soumyajit Roy.
+Source and design © Soumyajit Roy, 2026. Concept and design by Soumyajit Roy. GNU GPLv3
