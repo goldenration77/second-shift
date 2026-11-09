@@ -1,0 +1,47 @@
+name: Build Desktop App
+
+on:
+  workflow_dispatch:   # Manual trigger
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+          - os: ubuntu-24.04      # Debian 12 / Ubuntu 24.04 compatible
+            name: Linux
+
+    runs-on: ${{ matrix.os }}
+    name: Build for ${{ matrix.name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build with Pake
+        uses: tw93/Pake@v3
+        with:
+          url: "./Second_Shift.html"
+          name: "Second Shift Prologue"
+          width: "1600"
+          height: "900"
+          # Optional:
+          # icon: "./icon.png"
+          # hide-title-bar: true   # only affects macOS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Second-Shift-${{ matrix.name }}
+          path: |
+            **/*.msi
+            **/*.dmg
+            **/*.app
+            **/*.deb
+            **/*.AppImage
+          retention-days: 7
