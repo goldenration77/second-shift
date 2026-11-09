@@ -1,4 +1,4 @@
-name: Build Desktop App with Pake
+name: Build Desktop App
 
 on:
   workflow_dispatch:
@@ -28,13 +28,32 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            build-essential \
+            curl wget file \
+            pkg-config
+
       - name: Install Pake CLI
         run: npm install -g pake-cli
 
       - name: Build App
         run: |
-          pake ./Second_Shift.html \
-            --name "Second Shift Prologue" \
+          pake "./Second_Shift.html" \
+            --name "Second-Shift-Prologue" \
             --width 1600 \
             --height 900
 
@@ -49,5 +68,5 @@ jobs:
             **/*.deb
             **/*.AppImage
             **/*.exe
-          retention-days: 7
           if-no-files-found: warn
+          retention-days: 5
