@@ -31,7 +31,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies (Linux only)
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -52,7 +52,7 @@ jobs:
 
       - name: Build App
         run: |
-          pake "./Second_Shift.html" \
+          pake "https://goldenration77.github.io/second-shift/Second_Shift.html" \
             --name "Second-Shift-Prologue" \
             --width 1600 \
             --height 900
