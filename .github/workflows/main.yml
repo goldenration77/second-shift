@@ -2,6 +2,12 @@ name: Build Desktop App
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -55,16 +61,45 @@ jobs:
         run: |
           pake "https://goldenration77.github.io/second-shift/Second_Shift.html" --name "Second-Shift-Prologue" --width 1600 --height 900
 
+      - name: Package release files
+        shell: bash
+        run: |
+          mkdir -p release-assets
+
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            find . -type f \( -name '*.msi' -o -name '*.exe' \) -exec cp {} release-assets/ \;
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            find . -type f -name '*.dmg' -exec cp {} release-assets/ \;
+            while IFS= read -r -d '' app; do
+              ditto -c -k --sequesterRsrc --keepParent "$app" "release-assets/$(basename "$app").zip"
+            done < <(find . -type d -name '*.app' -print0)
+          else
+            find . -type f \( -name '*.deb' -o -name '*.AppImage' \) -exec cp {} release-assets/ \;
+          fi
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Second-Shift-${{ matrix.name }}
-          path: |
-            **/*.msi
-            **/*.dmg
-            **/*.app
-            **/*.deb
-            **/*.AppImage
-            **/*.exe
-          if-no-files-found: warn
+          path: release-assets/*
+          if-no-files-found: error
           retention-days: 5
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Second-Shift-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Second Shift ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/*
