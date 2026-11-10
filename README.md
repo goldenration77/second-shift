@@ -7,10 +7,60 @@ You are a licensed reactor operator on the night shift at a fictional coastal nu
 [![Play in browser](https://img.shields.io/badge/Play-Second%20Shift-8B5CF6?style=for-the-badge)](index.html)
 [![Desktop releases](https://img.shields.io/badge/Download-Desktop%20Releases-2563EB?style=for-the-badge)](https://github.com/goldenration77/second-shift/releases/latest)
 [![Single-file game](https://img.shields.io/badge/Format-Single%20HTML%20file-22C55E?style=for-the-badge)](index.html)
-[![No install required](https://img.shields.io/badge/Setup-No%20install%20needed-FF8C00?style=for-the-badge)](index.html)
 [![License](https://img.shields.io/badge/License-GPLv3-DC2626?style=for-the-badge)](LICENSE)
 
 Play in a modern browser with the self-contained `index.html` file, or download a packaged desktop build from the [latest release](https://github.com/goldenration77/second-shift/releases/latest). The published browser version is also available [here](https://goldenration77.github.io/second-shift/).
+
+## Desktop app setup
+
+Download the build for your operating system from [GitHub Releases](https://github.com/goldenration77/second-shift/releases/latest). The packaged apps do not require you to install Node.js, Rust, or Pake.
+
+### Windows
+
+1. Download `Second-Shift-Prologue.msi` and open it.
+2. Follow the installer prompts, then launch **Second Shift** from the Start menu.
+
+### macOS
+
+1. Download `Second-Shift-Prologue.dmg` and open it.
+2. Move the app to Applications if prompted, then launch it.
+3. If macOS blocks an app downloaded from the internet, use **System Settings → Privacy & Security** to review and allow it, or Control-click the app and choose **Open** if that option is available. Only do this if you trust the download.
+
+### Linux
+
+Choose either package format from the release:
+
+**AppImage:** make the downloaded file executable, then run it:
+
+```bash
+chmod +x second-shift-prologue.AppImage
+./second-shift-prologue.AppImage
+```
+
+You can also set the executable permission in your file manager’s file properties. Some Linux systems may need FUSE support to launch an AppImage; if it fails, use the `.deb` package or consult your distribution’s AppImage/FUSE documentation.
+
+**Debian/Ubuntu package:** install the `.deb` with APT so package dependencies are handled by your system package manager:
+
+```bash
+sudo apt install ./second-shift-prologue.deb
+```
+
+Enter your password when prompted. Launch the app from your desktop menu. To uninstall, use your package manager, for example `sudo apt remove second-shift-prologue` if that is the installed package name on your system.
+
+### Offline use
+
+The browser game is self-contained: download `index.html` once and open it locally to play without a network connection. **The current desktop release build is generated from the published website URL**, so do not assume the packaged desktop app works offline; it may need an internet connection to load the game. For guaranteed offline play, use the downloaded HTML file in a browser.
+
+## Building the desktop app from source
+
+These are build-time requirements for contributors, not dependencies needed to install a release:
+
+- Node.js 22
+- Rust stable toolchain
+- Pake CLI (`npm install -g pake-cli`)
+- Linux builds additionally need the system development libraries and tools listed in [the desktop build workflow](.github/workflows/main.yml), including GTK/WebKitGTK, `pkg-config`, and a C/C++ build toolchain.
+
+The workflow builds separately on Windows, macOS, and Ubuntu 22.04. Linux setup in the workflow uses `apt-get` to install the native build dependencies. Use the workflow as the source of truth for the exact package list and build command.
 
 ## Releases
 
