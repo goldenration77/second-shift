@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SECOND SHIFT — Kaveri Delta APS Unit 3</title>
+<title>SECOND SHIFT: Prologue</title>
 <style>
 /* ============================================================
    SECOND SHIFT — single-file build
@@ -678,6 +678,13 @@ body.mode-mobile .agauge-grid{grid-template-columns:repeat(3,1fr)}
 body.mode-mobile .chapters-bd{grid-template-columns:1fr}
 body.mode-mobile .chapters{width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0}
 body.mode-mobile .obj-bar{font-size:calc(var(--fs)*8px);padding:0 6px;gap:6px}
+.proc-list{display:flex;flex-direction:column;gap:2px}
+.proc-phase{font-size:calc(var(--fs)*8px);letter-spacing:.18em;color:var(--amber);margin:7px 0 2px;font-weight:700}
+.proc-phase:first-child{margin-top:0}
+.chk.cur{color:var(--paper)}
+.chk.cur .box{border-color:var(--amber);background:#2A2110}
+.rod-bar.h i{background:linear-gradient(90deg,#2F6FA8,#E8A317,#E0392B)}
+.rod-bar.s i{background:linear-gradient(90deg,#3FA45B,#E8A317,#E0392B)}
 </style>
 </head>
 <body>
@@ -701,12 +708,12 @@ body.mode-mobile .obj-bar{font-size:calc(var(--fs)*8px);padding:0 6px;gap:6px}
         <div id="hornBadge" class="horn-badge">HORN</div>
         <div id="crewStrip" class="crew-strip"></div>
         <div class="hdr-btns">
-          <button class="hbtn icon" id="btnBook" title="Quick reference (F1)">BOOK</button>
-          <button class="hbtn icon" id="btnSet" title="Settings">SET</button>
-          <button class="hbtn icon" id="btnMap" title="Rooms">MAP</button>
+          <button type="button" class="hbtn icon" id="btnBook" title="Quick reference (F1)">BOOK</button>
+          <button type="button" class="hbtn icon" id="btnSet" title="Settings">SET</button>
+          <button type="button" class="hbtn icon" id="btnMap" title="Rooms">MAP</button>
         </div>
-        <button class="hbtn" id="btnMute">SND</button>
-        <button class="hbtn" id="btnPause">II</button>
+        <button type="button" class="hbtn" id="btnMute">SND</button>
+        <button type="button" class="hbtn" id="btnPause">II</button>
       </div>
     </header>
 
@@ -719,7 +726,7 @@ body.mode-mobile .obj-bar{font-size:calc(var(--fs)*8px);padding:0 6px;gap:6px}
           <div class="panel-hd">
             <span class="lbl">A · ANNUNCIATOR MATRIX</span>
             <span class="pg" id="annPage">PAGE 1 / 2</span>
-            <span class="pg-btns"><button data-pg="-1">‹</button><button data-pg="1">›</button></span>
+            <span class="pg-btns"><button type="button" data-pg="-1">‹</button><button type="button" data-pg="1">›</button></span>
           </div>
           <div id="annGrid" class="ann-grid"></div>
         </div>
@@ -759,7 +766,7 @@ body.mode-mobile .obj-bar{font-size:calc(var(--fs)*8px);padding:0 6px;gap:6px}
         <div class="panel" id="pnlKey">
           <div class="panel-hd">
             <span class="lbl">F · KEYPAD</span>
-            <button class="go-btn" id="btnGo">GO TO COMPUTER ROOM ›</button>
+            <button type="button" class="go-btn" id="btnGo">GO TO COMPUTER ROOM ›</button>
           </div>
           <div class="mob-echo"><span class="pr">&gt;</span><span id="echoTextMob"></span><span class="cursor"></span></div>
           <div class="kp-body" id="keypad"></div>
@@ -837,6 +844,10 @@ P_({tag:'ECCS-B-PMP',caption:'ECCS TRN B',      unit:'',    group:'A', tier:'B',
 P_({tag:'VOID',    caption:'VOID FRACTION',unit:'%',   group:'A', tier:'A', min:0, max:100, hi:null, lo:null, dec:1});
 P_({tag:'ORM',     caption:'ORM',          unit:'rod', group:'A', tier:'A', min:0, max:220, hi:null, lo:15, dec:0});
 P_({tag:'GRAPHITE',caption:'GRAPHITE TEMP',unit:'°C',  group:'A', tier:'A', min:0, max:900, hi:null, lo:null, dec:0});
+
+/* ---- fuel cycle and grid ---- */
+P_({tag:'AO',     caption:'AXIAL OFFSET', unit:'%',   group:'A', tier:'A', min:-12, max:12, hi:6, lo:-6, dec:1});
+P_({tag:'EXPORT', caption:'NET EXPORT',   unit:'MWe', group:'C', tier:'A', min:0, max:600, hi:null, lo:null, dec:0});
 
 /* ---- reactivity control ---- */
 P_({tag:'ROD-REG', caption:'ROD BANK REG', unit:'%',   group:'A', tier:'A', min:0, max:100, hi:null, lo:null, dec:1});
@@ -976,8 +987,9 @@ const S = {
   /* --- misc --- */
   chanBias: 0, przLeak: 0, sg2Leak: 0, rodDrift: 0,
   coreDamage: 0, fuelRho: 0, porvClosed: true, uncover: 0, blackout: false,
+  house: 25, burnRho: 0, avgBurn: 0.55, ao: 0, gridStep: 0, gridShed: 0, gridStage: 0, agc: false,
   channels: [], bundles: 12,
-  heatRate: 0
+  heatRate: 0, heatRateUp: 0.35, heatup: false, stress: 0, shockDone: false
 };
 
 /* saturation temperature from pressure, degC (steam-table fit) */
@@ -992,7 +1004,7 @@ function reactivity(){
   const rBor = -PHYS.BORON_K * (S.boron - PHYS.BORON_REF);
   const rXe  = -PHYS.XE_W * (S.xenon - 1);
   const rT   = -PHYS.DOPPLER*(S.fuelTemp - 500) - PHYS.MODCOEF*(S.tavg - 292);
-  return rRod + rAdj + rBor + rXe + rT + S.rodDrift + (S.fuelRho||0);
+  return rRod + rAdj + rBor + rXe + rT + S.rodDrift + (S.fuelRho||0) + (S.burnRho||0);
 }
 
 /* the operating envelope, derived from state rather than stored */
@@ -1025,6 +1037,75 @@ function phwrRods(dts){
   S.rodPos = S.rodPos + clamp(S.rodTarget - S.rodPos, -rodRate*dts, rodRate*dts);
   S.rodPos = clamp(S.rodPos, 0, 100);
   S.rodAdj = clamp(S.rodAdj + clamp(S.rodAdjTarget - S.rodAdj, -0.4*dts, 0.4*dts), 0, 100);
+}
+
+/* ============================================================
+   THE GRID — a small interconnected system with real inertia
+   ============================================================ */
+const GRID = {
+  BASE: 2000,      // MW of system demand at nominal
+  H: 6,            // s, system inertia constant
+  DROOP: 0.04,     // per unit, governor droop
+  OTHER: 1230      // MW from everyone else, at 50 Hz
+};
+function gridDemand(){
+  const t = GAME.elapsed || 0;
+  const phase = (t/480)*Math.PI*2;                 // one day compressed into eight minutes
+  const daily = 0.90 + 0.06*Math.sin(phase - 1.1);
+  const wobble = Math.sin(t/37)*0.004 + Math.sin(t/11)*0.0016;
+  return GRID.BASE*(daily + wobble) + (S.gridStep||0) - (S.gridShed||0);
+}
+function gridTick(dts){
+  const other = GRID.OTHER + (50 - S.gridHz)*900;
+  const demand = gridDemand();
+  const exportMW = S.genBrk ? Math.max(0, S.turbLoad - S.house) : 0;
+  S.exportMW = exportMW;
+  const imbalance = exportMW + other - demand;
+  S.gridHz += (imbalance/(2*GRID.H*GRID.BASE))*50*dts;
+  S.gridHz = clamp(S.gridHz, 44, 56);
+
+  /* under-frequency load shedding, in stages */
+  const stages = [49.0, 48.6, 48.2];
+  for (let i=0;i<3;i++){
+    if (S.gridHz < stages[i] && S.gridStage <= i){
+      S.gridStage = i+1;
+      S.gridShed = [100, 200, 400][i];
+      soe('GRD','UFLS','UNDER-FREQUENCY LOAD SHEDDING STAGE '+(i+1));
+      emit('UNDER-FREQUENCY. LOAD SHEDDING STAGE '+(i+1)+' — '+S.gridShed+' MW OFF.','err');
+      audio.beep('crit');
+    }
+  }
+  /* collapse and overspeed */
+  if (S.gridHz < 47.0 && !GAME.gridCollapsed){
+    GAME.gridCollapsed = true;
+    S.genBrk = false; S.blackout = true;
+    emit('','dim');
+    emit('  GRID COLLAPSE. THE SYSTEM HAS GONE BLACK.','err');
+    soe('GRD','—','GRID COLLAPSE');
+    audio.sirenStart(); audio.beep('crit'); shake(6);
+  }
+  if (S.gridHz > 51.5 && S.genBrk){
+    S.genBrk = false;
+    emit('OVER-FREQUENCY. THE UNIT HAS TRIPPED OFF THE GRID.','err');
+    soe('TRP','GEN-BRK','OVER-FREQUENCY TRIP');
+    audio.beep('crit');
+  }
+  /* occasional real-world load steps */
+  if (!GAME.nextGridEvent) GAME.nextGridEvent = 45;
+  GAME.nextGridEvent -= dts;
+  if (GAME.nextGridEvent <= 0){
+    GAME.nextGridEvent = 55 + rnd()*70;
+    const roll = rnd();
+    if (roll < 0.45){ S.gridStep = 40 + rnd()*40; }
+    else if (roll < 0.75){ S.gridStep = -(40 + rnd()*40); }
+    else if (roll < 0.92){ S.gridStep = 120 + rnd()*60; }
+    else { S.gridStep = -(120 + rnd()*60); }
+    GAME.gridStepUntil = 6 + rnd()*8;
+  }
+  if (S.gridStep && GAME.gridStepUntil != null){
+    GAME.gridStepUntil -= dts;
+    if (GAME.gridStepUntil <= 0){ S.gridStep = 0; GAME.gridStepUntil = null; }
+  }
 }
 
 function simTick(dt){
@@ -1076,6 +1157,12 @@ function simTick(dt){
       const c = S.channels[(S.burnTick/10*31 + i*10) % 306];
       if (c) c.b = Math.min(1, c.b + rate);
     }
+    let sum = 0;
+    for (const c of S.channels) sum += c.b;
+    S.avgBurn = sum/Math.max(1,S.channels.length);
+    /* burnt fuel is negative reactivity: refuelling is how the plant pays it back */
+    S.burnRho = S.rt==='RBMK' ? 0 : -2500*(S.avgBurn - 0.55);
+    S.ao *= (1 - Math.min(1, dts/420));            /* flux flattens out over hours */
   }
 
   /* ---------- xenon / iodine ---------- */
@@ -1101,6 +1188,23 @@ function simTick(dt){
     const qOut = 43*Math.min(1.15, steamOut)*(S.flow/100) + eccsCool;
     S.heatRate = qIn - qOut;
     S.tavg += (qIn - qOut)*0.014*dts;
+    /* heat-up: heaters and pump work bring the loop to temperature. It only works
+       with the pumps running and shutdown cooling isolated, and the rate is the
+       operator's choice — a fast heat-up stresses the pressure tubes. */
+    if (S.heatup && !S.sdc && S.flow >= 90 && S.tavg < 291 && !S.scram){
+      S.tavg += S.heatRateUp*dts;
+      S.stress = Math.min(120, (S.stress||0) + Math.max(0, S.heatRateUp - 0.5)*dts*0.4);
+    } else {
+      S.stress = Math.max(0, (S.stress||0) - dts*0.5);
+    }
+    if (S.stress >= 60 && !S.shockDone){
+      S.shockDone = true;
+      S.przLeak = (S.przLeak||0) + 6;
+      emit('','dim');
+      emit('  THERMAL SHOCK. PRESSURE TUBE LEAK ON THE HOT LEG.','err');
+      soe('TRP','RCS-PR','THERMAL SHOCK — TUBE LEAK');
+      audio.beep('crit'); shake(4);
+    }
     if (S.sdc && S.corePower < 3){
       S.tavg += (60 - S.tavg)*Math.min(1, dts/220);
     }
@@ -1148,7 +1252,14 @@ function simTick(dt){
     S.turbSpeed += (targetSpeed - S.turbSpeed)*Math.min(1, dts/8);
   }
   const steamCap = (S.corePower + S.decayHeat)*5.2*1.06;
-  const avail = S.genBrk ? Math.min(S.turbSet*5.2, steamCap, Math.max(0,(S.sg1Press-12)*16)) : 0;
+  /* governor setpoint plus droop: the machine picks up load as the grid slows */
+  const droopMW = (50 - S.gridHz)/50/GRID.DROOP*520;
+  if (S.agc && S.genBrk){
+    const err = 50 - S.gridHz;
+    S.turbSet = clamp(S.turbSet + clamp(err*3.0, -0.35, 0.35), 0, 105);
+  }
+  const govMW = S.turbSet*5.2 + droopMW;
+  const avail = S.genBrk ? Math.min(Math.max(0, govMW), steamCap, Math.max(0,(S.sg1Press-12)*18)) : 0;
   const prevLoad = S.turbLoad;
   S.turbLoad += (avail - S.turbLoad)*Math.min(1, dts/6);
   S.turbLoad = clamp(S.turbLoad, 0, 560);
@@ -1160,7 +1271,7 @@ function simTick(dt){
   }
 
   /* ---------- grid ---------- */
-  S.gridHz += ((50.0 - S.gridHz)*0.5 + (prevLoad - S.turbLoad)*0.0012)*dts;
+  gridTick(dts);
 
   /* ---------- dc bus ---------- */
   const dcGen = (S.dg1?9:0)+(S.dg2?9:0)+(S.battChg?5:0)+((S.busTie&&(S.dg1||S.dg2))?4:0);
@@ -1206,6 +1317,8 @@ function project(){
   setP('MSIV-1', S.msiv?1:0);
   setP('GEN-BRK', S.genBrk?1:0);
   setP('GRID-HZ', S.gridHz);
+  setP('AO', S.ao);
+  setP('EXPORT', S.genBrk ? Math.max(0, S.turbLoad - S.house) : 0);
   setP('DG-1', S.dg1?1:0);
   setP('DC-BUS-A', S.dcBus);
   setP('CNT-PR', 0.4 + (S.coreDamage>20?2.9:0) + n*0.05);
@@ -1232,7 +1345,15 @@ function setPlant(state){
   if (S.rt==='RBMK'){ buildRodArray(); } else { S.rods = []; }
   S.void = 0.25; S.graphiteT = 600; S.orm = 0;
   S.channels = [];
-  for (let i=0;i<306;i++) S.channels.push({b: 0.22 + rnd()*0.74, ch: i+1});
+  for (let i=0;i<306;i++){
+    const ring = Math.sqrt((i%18)/18);
+    S.channels.push({
+      b: 0.25 + rnd()*0.60, ch: i+1,
+      w: 0.62 + 0.75*Math.exp(-ring*ring*1.6),     /* central channels are worth more */
+      dir: i % 2 === 0 ? 1 : -1                     /* alternating fuelling direction */
+    });
+  }
+  S.bundles = 240; S.ao = 0; S.burnRho = 0; S.avgBurn = 0.55;
   S.trip = null; S.scram = false; S.coreDamage = 0;
   S.rodDrift = 0; S.przLeak = 0; S.sg2Leak = 0; S.chanBias = 0;
   if (state === 'fullpower'){
@@ -1286,6 +1407,7 @@ function setPlant(state){
     S.fw1 = S.fw2 = false; S.rcp1 = S.rcp2 = false;
     S.genBrk = false; S.msiv = false; S.przHeater = false; S.sdc = true;
   }
+  S.heatup = false; S.stress = 0; S.shockDone = false; S.heatRateUp = 0.35;
   S.flow = (S.rcp1?50:0)+(S.rcp2?50:0);
   if (S.rt==='RBMK'){
     /* solve for the xenon that puts the core exactly critical at this state */
@@ -1356,20 +1478,25 @@ const PT_EN = {
 Object.keys(PT_EN).forEach(k=>{ if (PIDX[k]) PIDX[k].enabled = PT_EN[k]; });
 
 const STARTUP_STEPS = [
-  {t:'BORON AT LEAST 600 ppm', ok:()=> S.boron >= 600},
-  {t:'ALL RODS FULLY INSERTED', ok:()=> S.rodPos < 1 && S.rodAdj < 1},
-  {t:'SHUTDOWN COOLING ISOLATED', ok:()=> !S.sdc},
-  {t:'BOTH COOLANT PUMPS RUNNING', ok:()=> S.rcp1 && S.rcp2},
-  {t:'PRIMARY AT 280 °C OR ABOVE', ok:()=> S.tavg >= 280},
-  {t:'PRIMARY AT 145 bar OR ABOVE', ok:()=> S.rcsPress >= 145},
-  {t:'BORON DILUTED BELOW 620 ppm', ok:()=> S.boron < 620},
-  {t:'REACTOR CRITICAL — PERIOD STABLE', ok:()=> S.rho > -25 && S.corePower > 0.05},
-  {t:'POWER ABOVE 2 %FP', ok:()=> S.corePower >= 2},
-  {t:'FEEDWATER PUMPS RUNNING', ok:()=> S.fw1 || S.fw2},
-  {t:'MSIV OPEN — STEAM TO TURBINE', ok:()=> S.msiv},
-  {t:'TURBINE AT 2950 rpm OR ABOVE', ok:()=> S.turbSpeed >= 2950},
-  {t:'GENERATOR ON THE GRID (52-G1)', ok:()=> S.genBrk},
-  {t:'LOAD RAISED ABOVE 40 MWe', ok:()=> S.turbLoad >= 40}
+  {ph:'1 · PRE-START CHECKS', t:'BORON AT LEAST 1000 ppm', ok:()=> S.boron >= 1000},
+  {ph:'1 · PRE-START CHECKS', t:'ALL RODS FULLY INSERTED', ok:()=> S.rodPos < 1 && S.rodAdj < 1},
+  {ph:'1 · PRE-START CHECKS', t:'SHUTDOWN COOLING IN SERVICE', ok:()=> S.sdc},
+  {ph:'1 · PRE-START CHECKS', t:'PRIMARY BELOW 80 °C', ok:()=> S.tavg < 80},
+  {ph:'2 · CIRCULATION', t:'BOTH COOLANT PUMPS RUNNING', ok:()=> S.rcp1 && S.rcp2},
+  {ph:'2 · CIRCULATION', t:'SHUTDOWN COOLING ISOLATED', ok:()=> !S.sdc},
+  {ph:'3 · HEAT-UP', t:'HEAT-UP STARTED', ok:()=> S.heatup || S.tavg > 100},
+  {ph:'3 · HEAT-UP', t:'PRIMARY ABOVE 150 °C', ok:()=> S.tavg >= 150},
+  {ph:'3 · HEAT-UP', t:'PRIMARY ABOVE 280 °C', ok:()=> S.tavg >= 280},
+  {ph:'4 · PRESSURISATION', t:'PRESSURISER HEATERS ON', ok:()=> S.przHeater},
+  {ph:'4 · PRESSURISATION', t:'PRIMARY ABOVE 145 bar', ok:()=> S.rcsPress >= 145},
+  {ph:'5 · CRITICALITY', t:'BORON DILUTED BELOW 620 ppm', ok:()=> S.boron < 620},
+  {ph:'5 · CRITICALITY', t:'REACTOR CRITICAL — PERIOD STABLE', ok:()=> S.rho > -25 && S.corePower > 0.05},
+  {ph:'5 · CRITICALITY', t:'POWER ABOVE 2 %FP', ok:()=> S.corePower >= 2},
+  {ph:'6 · TURBINE', t:'FEEDWATER PUMPS RUNNING', ok:()=> S.fw1 || S.fw2},
+  {ph:'6 · TURBINE', t:'MSIV OPEN — STEAM TO TURBINE', ok:()=> S.msiv},
+  {ph:'6 · TURBINE', t:'TURBINE AT 2950 rpm OR ABOVE', ok:()=> S.turbSpeed >= 2950},
+  {ph:'6 · TURBINE', t:'GENERATOR ON THE GRID (52-G1)', ok:()=> S.genBrk},
+  {ph:'6 · TURBINE', t:'LOAD RAISED ABOVE 40 MWe', ok:()=> S.turbLoad >= 40}
 ];
 
 /* ============================================================
@@ -1643,7 +1770,7 @@ const SH = { buffer:'', history:[], histIdx:-1, where:'desk', lastCmd:'' };
 const outq = [];
 let typeBudget = 0;
 
-function print(text='', cls=''){
+function emit(text='', cls=''){
   const el = document.createElement('div');
   if (cls) el.className = cls;
   el.textContent = '';
@@ -1706,8 +1833,8 @@ const SW = {
   'SDC':     {on:'ON', off:'OFF', get:()=>S.sdc, set:v=>S.sdc=v},
   'PORV':    {on:'CLOSE', off:'OPEN', get:()=>S.porvClosed, set:v=>{
                S.porvClosed = v;
-               if (v){ print('PORV CLOSED. THE LEAK STOPS HERE — IF IT IS THE PORV.','ph'); soe('SW','PORV','PORV CLOSED'); }
-               else { print('PORV OPEN — RELIEVING TO THE QUENCH TANK','warn'); }
+               if (v){ emit('PORV CLOSED. THE LEAK STOPS HERE — IF IT IS THE PORV.','ph'); soe('SW','PORV','PORV CLOSED'); }
+               else { emit('PORV OPEN — RELIEVING TO THE QUENCH TANK','warn'); }
              }}
 };
 const SW_ALIAS = {'PRZ-HEATER':'PRZ-HTR','SPRAY':'PRZ-SPRAY','FW-PMP-2':'FW-2P','FW-PMP-1':'FW-1P',
@@ -1739,6 +1866,8 @@ const VERBS = {
   scram: {perm:'write',use:'scram'},
   sync:  {perm:'write',use:'sync'},
   gov:   {perm:'write',use:'gov <0-100>'},
+  agc:   {perm:'write',use:'agc <on|off>'},
+  heatup:{perm:'write',use:'heatup <on|off|fast|slow>'},
   door:  {perm:'write',use:'door <D1..D6> <open|close>'},
   fuel:  {perm:'write',use:'fuel <channel|list|status>'},
   run:   {perm:'write',use:'run <macro>'},
@@ -1747,8 +1876,8 @@ const VERBS = {
 };
 
 function err(code, msg, hint){
-  print('E'+code+'  '+msg, 'err');
-  if (hint) print('      '+hint, 'dim');
+  emit('E'+code+'  '+msg, 'err');
+  if (hint) emit('      '+hint, 'dim');
 }
 
 function resolveTag(t){
@@ -1764,7 +1893,7 @@ function resolveTag(t){
 
 function execute(raw){
   const line = raw.trim();
-  print('> '+raw, 'cmd');
+  emit('> '+raw, 'cmd');
   if (!line) return;
   SH.lastCmd = line;
   SH.history.push(line); if (SH.history.length>60) SH.history.shift();
@@ -1808,24 +1937,24 @@ const CMD = {
   help(a){
     if (a[0] && VERBS[a[0].toLowerCase()]){
       const v=a[0].toLowerCase();
-      print('USAGE   '+VERBS[v].use);
-      print('ACCESS  '+(VERBS[v].perm==='read'?'ANY CONSOLE':VERBS[v].perm==='write'?'COMPUTER ROOM':'SECOND BADGE'));
+      emit('USAGE   '+VERBS[v].use);
+      emit('ACCESS  '+(VERBS[v].perm==='read'?'ANY CONSOLE':VERBS[v].perm==='write'?'COMPUTER ROOM':'SECOND BADGE'));
       return;
     }
-    print('PTY-1  PROCESS COMMAND SET  ·  REV 4.2', 'ph');
-    print('');
-    print('  pt      read a point          sw      operate a switch', 'dim');
-    print('  trend   assign a recorder     sp      set a setpoint', 'dim');
-    print('  alm     list alarms           tag     tag a point out', 'dim');
-    print('  ack     silence the horn      bypass  defeat an interlock', 'dim');
-    print('  soe     sequence of events    force   write a point', 'dim');
-    print('  csf     safety functions      run     run a macro', 'dim');
-    print('  hist    past values           log     write the shift log', 'dim');
-    print('  time    plant clock           sign    sign the log', 'dim');
-    print('  who     signed-in badges      proc    open a procedure', 'dim');
-    print('  step    move to a step        clear   clear the screen', 'dim');
-    print('');
-    print('  help <verb> FOR USAGE', 'dim');
+    emit('PTY-1  PROCESS COMMAND SET  ·  REV 4.2', 'ph');
+    emit('');
+    emit('  pt      read a point          sw      operate a switch', 'dim');
+    emit('  trend   assign a recorder     sp      set a setpoint', 'dim');
+    emit('  alm     list alarms           tag     tag a point out', 'dim');
+    emit('  ack     silence the horn      bypass  defeat an interlock', 'dim');
+    emit('  soe     sequence of events    force   write a point', 'dim');
+    emit('  csf     safety functions      run     run a macro', 'dim');
+    emit('  hist    past values           log     write the shift log', 'dim');
+    emit('  time    plant clock           sign    sign the log', 'dim');
+    emit('  who     signed-in badges      proc    open a procedure', 'dim');
+    emit('  step    move to a step        clear   clear the screen', 'dim');
+    emit('');
+    emit('  help <verb> FOR USAGE', 'dim');
   },
 
   pt(a){
@@ -1835,22 +1964,22 @@ const CMD = {
     if (p.hidden){ err('01','TAG NOT FOUND'); return; }
     const st = p.inTest ? 'TEST' : p.quality;
     const shown = (p.kind==='state' && p.stateLabels) ? p.stateLabels[p.value?1:0] : fmt(p.value,p.dec);
-    print(p.tag.padEnd(14)+p.caption.padEnd(20)+String(shown).padStart(8)+' '+p.unit.padEnd(6)+st);
+    emit(p.tag.padEnd(14)+p.caption.padEnd(20)+String(shown).padStart(8)+' '+p.unit.padEnd(6)+st);
     const al = p.state==='ALARM'?'ALARM':p.state==='ACKED'?'ACKED':p.state==='SUPPRESSED'?'---':'NORMAL';
-    print('  RANGE '+fmt(p.min,0)+' - '+fmt(p.max,0)+'   ALARM '+al.padEnd(8)+' CHANGED '+plantClock(p.ts||nowMs), 'dim');
+    emit('  RANGE '+fmt(p.min,0)+' - '+fmt(p.max,0)+'   ALARM '+al.padEnd(8)+' CHANGED '+plantClock(p.ts||nowMs), 'dim');
     const d = channelDisagree(p.tag);
-    if (d) print('E23  CHANNEL DISAGREES  '+fmt(d,2)+(p.unit==='bar'?' bar':''), 'err');
+    if (d) emit('E23  CHANNEL DISAGREES  '+fmt(d,2)+(p.unit==='bar'?' bar':''), 'err');
     if (p.inTest) err('12','POINT IN TEST','CHANNEL TAGGED OUT OF SERVICE — VALUE IS MEANINGLESS');
   },
 
   trend(a){
-    if (!a[0]){ print('TRACES:'); TRACES.forEach((t,i)=>print('  '+(i+1)+'  '+(t.tag||'---'))); return; }
+    if (!a[0]){ emit('TRACES:'); TRACES.forEach((t,i)=>emit('  '+(i+1)+'  '+(t.tag||'---'))); return; }
     const p = resolveTag(a[0]);
     if (!p){ err('01','TAG NOT FOUND'); return; }
     const span = a[1]||'1h';
     if (TRACES.length>=4) TRACES.shift();
     TRACES.push({tag:p.tag, data:[], unit:p.unit, dec:p.dec, span});
-    print('TRACE '+TRACES.length+' ASSIGNED TO '+p.tag+'  ('+span+')');
+    emit('TRACE '+TRACES.length+' ASSIGNED TO '+p.tag+'  ('+span+')');
     updateRecLabel();
   },
 
@@ -1858,39 +1987,39 @@ const CMD = {
     const unacked = a[0]==='/u';
     const grp = (a.find(x=>/^[A-F]$/i.test(x))||'').toUpperCase();
     const list = POINTS.filter(p=>(p.state==='ALARM'||p.state==='ACKED') && (!unacked||p.state==='ALARM') && (!grp||p.group===grp));
-    if (!list.length){ print('NO ALARMS'+(grp?' IN GROUP '+grp:''), 'dim'); return; }
-    print('ID    TAG            ALARM                     TIME      ST', 'ph');
+    if (!list.length){ emit('NO ALARMS'+(grp?' IN GROUP '+grp:''), 'dim'); return; }
+    emit('ID    TAG            ALARM                     TIME      ST', 'ph');
     list.forEach((p,i)=>{
       const id = p.group+'-'+pad2(p.idx+1);
       const st = p.state==='ALARM'?'A':'K';
-      print(id.padEnd(6)+p.tag.padEnd(15)+p.caption.padEnd(26)+plantClock(p.tsTrip||nowMs).slice(0,8)+'  '+st);
+      emit(id.padEnd(6)+p.tag.padEnd(15)+p.caption.padEnd(26)+plantClock(p.tsTrip||nowMs).slice(0,8)+'  '+st);
     });
-    print(list.length+' ALARM(S)'+(unacked?' UNACKNOWLEDGED':''), 'dim');
+    emit(list.length+' ALARM(S)'+(unacked?' UNACKNOWLEDGED':''), 'dim');
   },
 
   ack(a){
     if (!a[0]){ err('01','TAG NOT FOUND','USAGE: ack <id|tag|all>'); return; }
-    if (a[0].toLowerCase()==='all'){ const n=ackAll(); print(n?n+' POINT(S) ACKNOWLEDGED':'NOTHING TO ACKNOWLEDGE', n?'':'dim'); return; }
+    if (a[0].toLowerCase()==='all'){ const n=ackAll(); emit(n?n+' POINT(S) ACKNOWLEDGED':'NOTHING TO ACKNOWLEDGE', n?'':'dim'); return; }
     const p = resolveTag(a[0]);
     if (!p){ err('01','TAG NOT FOUND'); return; }
-    if (p.state!=='ALARM'){ print('POINT NOT IN ALARM','dim'); return; }
-    ackPoint(p); print(p.tag+' ACKNOWLEDGED','dim');
+    if (p.state!=='ALARM'){ emit('POINT NOT IN ALARM','dim'); return; }
+    ackPoint(p); emit(p.tag+' ACKNOWLEDGED','dim');
   },
 
   soe(a){
     const n = clamp(parseInt(a[0])||20, 1, 60);
-    print('TIME        EVENT  TAG            TEXT', 'ph');
+    emit('TIME        EVENT  TAG            TEXT', 'ph');
     SOE.slice(-n).reverse().forEach(e=>{
-      print(plantClock(e.t).slice(0,8)+'    '+e.kind.padEnd(6)+e.tag.padEnd(15)+e.text);
+      emit(plantClock(e.t).slice(0,8)+'    '+e.kind.padEnd(6)+e.tag.padEnd(15)+e.text);
     });
-    if (!SOE.length) print('BUFFER EMPTY','dim');
+    if (!SOE.length) emit('BUFFER EMPTY','dim');
   },
 
   csf(){
-    print('CRITICAL SAFETY FUNCTIONS', 'ph');
+    emit('CRITICAL SAFETY FUNCTIONS', 'ph');
     csfRows().forEach(r=>{
       const s = r.s==='g'?'GREEN':r.s==='a'?'AMBER':'RED  ';
-      print('  '+r.name.padEnd(20)+s+'   '+r.v);
+      emit('  '+r.name.padEnd(20)+s+'   '+r.v);
     });
   },
 
@@ -1899,25 +2028,25 @@ const CMD = {
     const p = resolveTag(a[0]);
     if (!p){ err('01','TAG NOT FOUND'); return; }
     const buf = p.hist||[];
-    if (!buf.length){ print('NO HISTORY IN RING BUFFER','dim'); return; }
-    print('HIST '+p.tag+'  '+buf.length+' SAMPLES', 'ph');
+    if (!buf.length){ emit('NO HISTORY IN RING BUFFER','dim'); return; }
+    emit('HIST '+p.tag+'  '+buf.length+' SAMPLES', 'ph');
     const stride = Math.max(1, Math.floor(buf.length/12));
     for (let i=0;i<buf.length;i+=stride){
       const b=buf[i];
-      print('  '+plantClock(b.t).slice(0,8)+'   '+fmt(b.v,p.dec).padStart(8)+' '+p.unit);
+      emit('  '+plantClock(b.t).slice(0,8)+'   '+fmt(b.v,p.dec).padStart(8)+' '+p.unit);
     }
   },
 
   time(){
-    print('PLANT COMPUTER  '+plantClock(nowMs)+'   '+plantClockMs()+' ms');
-    print('WALL CLOCK      '+wallClock(), 'dim');
+    emit('PLANT COMPUTER  '+plantClock(nowMs)+'   '+plantClockMs()+' ms');
+    emit('WALL CLOCK      '+wallClock(), 'dim');
   },
 
   who(){
     const n = GAME.whoCount;
-    print(n+' BADGE(S) SIGNED IN', 'ph');
-    CREW_NAMES.slice(0,n).forEach((c,i)=>print('  '+c.badge+'  '+c.name.padEnd(22)+c.role));
-    if (n>CREW_NAMES.length) print('  ?????  ——————————', 'dim');
+    emit(n+' BADGE(S) SIGNED IN', 'ph');
+    CREW_NAMES.slice(0,n).forEach((c,i)=>emit('  '+c.badge+'  '+c.name.padEnd(22)+c.role));
+    if (n>CREW_NAMES.length) emit('  ?????  ——————————', 'dim');
   },
 
   proc(a){
@@ -1925,27 +2054,27 @@ const CMD = {
     const pr = PROCS[id];
     if (!pr){ err('01','TAG NOT FOUND','NO SUCH PROCEDURE'); return; }
     GAME.proc = id; GAME.step = 1;
-    print('PROCEDURE '+id+' — '+pr.title, 'ph');
-    pr.steps.forEach((s,i)=>print('  '+pad2(i+1)+'  '+s, i===0?'':'dim'));
-    print('STEP 1','warn');
+    emit('PROCEDURE '+id+' — '+pr.title, 'ph');
+    pr.steps.forEach((s,i)=>emit('  '+pad2(i+1)+'  '+s, i===0?'':'dim'));
+    emit('STEP 1','warn');
     showProc();
   },
 
   step(a){
-    if (!GAME.proc){ print('NO PROCEDURE OPEN','dim'); return; }
+    if (!GAME.proc){ emit('NO PROCEDURE OPEN','dim'); return; }
     const n = parseInt(a[0]);
     const pr = PROCS[GAME.proc];
     if (!n || n<1 || n>pr.steps.length){ err('01','TAG NOT FOUND','STEP OUT OF RANGE'); return; }
     GAME.step = n;
-    print('STEP '+pad2(n)+'  '+pr.steps[n-1], 'warn');
+    emit('STEP '+pad2(n)+'  '+pr.steps[n-1], 'warn');
     showProc();
   },
 
   log(a, rest){
     const txt = rest.replace(/^"|"$/g,'').trim();
-    if (!txt){ print('USAGE: log "<text>"','dim'); return; }
+    if (!txt){ emit('USAGE: log "<text>"','dim'); return; }
     GAME.log.push({t:plantClock(nowMs).slice(0,5), who:GAME.me, text:txt});
-    print('LOGGED  '+plantClock(nowMs).slice(0,8)+'  '+GAME.me+'  '+txt, 'dim');
+    emit('LOGGED  '+plantClock(nowMs).slice(0,8)+'  '+GAME.me+'  '+txt, 'dim');
     audio.printer(1);
   },
 
@@ -1966,13 +2095,13 @@ const CMD = {
       const why = d.il(true);
       if (why){ err('04','INTERLOCK ACTIVE', why); audio.relay(); return; }
     }
-    if (tag!=='ROD-BANK-A' && d.get()===on){ print(tag+' ALREADY '+st, 'dim'); return; }
+    if (tag!=='ROD-BANK-A' && d.get()===on){ emit(tag+' ALREADY '+st, 'dim'); return; }
     d.set(on);
     soe('SW', tag, tag+' '+st+(GAME.me?' /'+GAME.me:''));
-    print(tag+'  '+st+'   CONFIRMED', 'ph');
+    emit(tag+'  '+st+'   CONFIRMED', 'ph');
     audio.relay(); shake(2);
-    if (tag==='ROD-BANK-A') print('ROD TRAVEL IN PROGRESS — '+fmt(S.rodPos,0)+'% WITHDRAWN', 'dim');
-    if (tag==='GEN-BRK' && !on) print('LOAD REJECTED — TURBINE FREE RUNNING', 'warn');
+    if (tag==='ROD-BANK-A') emit('ROD TRAVEL IN PROGRESS — '+fmt(S.rodPos,0)+'% WITHDRAWN', 'dim');
+    if (tag==='GEN-BRK' && !on) emit('LOAD REJECTED — TURBINE FREE RUNNING', 'warn');
     saveHist();
   },
 
@@ -1983,16 +2112,16 @@ const CMD = {
     if (isNaN(v)){ err('01','TAG NOT FOUND','VALUE NOT NUMERIC'); return; }
     if (tag==='PRZ-LVL'){
       if (v<38||v>76){ err('04','INTERLOCK ACTIVE','PERMITTED BAND 38 - 76 %'); return; }
-      S.przSet = v; print('PRZ-LVL SETPOINT  '+fmt(v,1)+' %', 'ph'); saveHist(); return;
+      S.przSet = v; emit('PRZ-LVL SETPOINT  '+fmt(v,1)+' %', 'ph'); saveHist(); return;
     }
     if (tag==='CORE-PWR'){
       if (v<0||v>105){ err('04','INTERLOCK ACTIVE','PERMITTED BAND 0 - 105 %FP'); return; }
       S.rodPos = clamp(v/1.28,0,100);
-      print('CORE-PWR SETPOINT '+fmt(v,0)+' %FP  — RODS MOVING', 'ph'); saveHist(); return;
+      emit('CORE-PWR SETPOINT '+fmt(v,0)+' %FP  — RODS MOVING', 'ph'); saveHist(); return;
     }
     if (tag==='SG1-LVL'||tag==='SG2-LVL'){
       if (v<25||v>70){ err('04','INTERLOCK ACTIVE','PERMITTED BAND 25 - 70 %'); return; }
-      print(tag+' SETPOINT '+fmt(v,1)+' %  (FEEDWATER AUTO)', 'ph'); return;
+      emit(tag+' SETPOINT '+fmt(v,1)+' %  (FEEDWATER AUTO)', 'ph'); return;
     }
     err('01','TAG NOT FOUND','NO SETPOINT ON '+tag);
   },
@@ -2006,7 +2135,7 @@ const CMD = {
     else p.quality='GOOD';
     const why = a.slice(1).join(' ')||'NO REASON GIVEN';
     soe('TAG', p.tag, p.tag+(p.inTest?' TAGGED OUT: ':' RETURNED TO SERVICE: ')+why);
-    print(p.tag+(p.inTest?'  OUT OF SERVICE  ':'  RETURNED  ')+why, 'ph');
+    emit(p.tag+(p.inTest?'  OUT OF SERVICE  ':'  RETURNED  ')+why, 'ph');
     audio.printer(1);
   },
 
@@ -2016,8 +2145,8 @@ const CMD = {
     const tag = p?p.tag:a[0].toUpperCase();
     GAME.bypassed[tag]=true;
     soe('BYP', tag, 'INTERLOCK DEFEATED ON '+tag);
-    print('INTERLOCK DEFEATED: '+tag, 'err');
-    print('LOGGED. AUDIBLE. PERMANENT.','dim');
+    emit('INTERLOCK DEFEATED: '+tag, 'err');
+    emit('LOGGED. AUDIBLE. PERMANENT.','dim');
     audio.bell(); shake(4);
     /* force is the one command that ends runs — bypass only opens the door */
     if (GAME.mode==='night' && GAME.stage>=4) director.onBypass(tag);
@@ -2032,8 +2161,8 @@ const CMD = {
     p.forged = true; p.value = v;
     soe('FRC', p.tag, 'FORCED TO '+v+' BY '+GAME.me);
     GAME.log.push({t:plantClock(nowMs).slice(0,5), who:GAME.me, text:'FORCED '+p.tag+' TO '+v});
-    print(p.tag+'  FORCED  '+fmt(v,p.dec)+' '+p.unit, 'err');
-    print('THE PHYSICS DID NOT PRODUCE THIS VALUE.','dim');
+    emit(p.tag+'  FORCED  '+fmt(v,p.dec)+' '+p.unit, 'err');
+    emit('THE PHYSICS DID NOT PRODUCE THIS VALUE.','dim');
     audio.bell(); shake(6);
     director.onForce(p.tag, v);
   },
@@ -2043,7 +2172,7 @@ const CMD = {
     const arg = (a[1]||'').toLowerCase();
     if (bank==='auto'){
       S.rodAuto = arg!=='off';
-      print('ROD CONTROL '+(S.rodAuto?'AUTOMATIC':'MANUAL'), 'ph');
+      emit('ROD CONTROL '+(S.rodAuto?'AUTOMATIC':'MANUAL'), 'ph');
       return;
     }
     if (bank!=='reg' && bank!=='adj'){ err('01','TAG NOT FOUND','BANKS: reg, adj, auto'); return; }
@@ -2058,7 +2187,7 @@ const CMD = {
       if (v<0||v>100){ err('04','INTERLOCK ACTIVE','ROD POSITION 0 - 100 %'); return; }
       S[tgt] = v;
     }
-    print(bank.toUpperCase()+' RODS  '+fmt(cur,1)+'% -> '+fmt(S[tgt],1)+'%   DRIVING', 'ph');
+    emit(bank.toUpperCase()+' RODS  '+fmt(cur,1)+'% -> '+fmt(S[tgt],1)+'%   DRIVING', 'ph');
     soe('ROD', bank==='reg'?'ROD-REG':'ROD-ADJ', 'ROD TARGET '+fmt(S[tgt],1)+'%');
     audio.relay();
   },
@@ -2067,8 +2196,8 @@ const CMD = {
     const v = parseFloat(a[0]);
     if (isNaN(v) || v<0 || v>1600){ err('04','INTERLOCK ACTIVE','BORON 0 - 1600 ppm'); return; }
     S.boronTarget = v;
-    print('BORON TARGET '+fmt(v,0)+' ppm — CHARGING AT 2.2 ppm/s', 'ph');
-    print(v < S.boron ? 'DILUTING (ADDING PURE WATER)' : 'BORATING (ADDING BORIC ACID)', 'dim');
+    emit('BORON TARGET '+fmt(v,0)+' ppm — CHARGING AT 2.2 ppm/s', 'ph');
+    emit(v < S.boron ? 'DILUTING (ADDING PURE WATER)' : 'BORATING (ADDING BORIC ACID)', 'dim');
     soe('CHEM','BORON','BORON TARGET '+fmt(v,0)+' ppm');
   },
 
@@ -2076,11 +2205,30 @@ const CMD = {
 
   sync(){ doSync(); },
 
+  heatup(a){
+    const v = (a[0]||'on').toLowerCase();
+    if (v==='fast'){ S.heatRateUp = 1.15; S.heatup = true; }
+    else if (v==='slow'){ S.heatRateUp = 0.35; S.heatup = true; }
+    else S.heatup = (v!=='off');
+    emit('HEAT-UP '+(S.heatup?'ON':'OFF')+'  ·  '+fmt(S.heatRateUp,2)+' °C/s','ph');
+    if (S.heatup && S.sdc) emit('SHUTDOWN COOLING IS STILL IN SERVICE. ISOLATE IT FIRST.','warn');
+    if (S.heatup && S.flow < 90) emit('NO FLOW. START BOTH COOLANT PUMPS.','warn');
+    audio.relay();
+  },
+
+  agc(a){
+    const on = (a[0]||'on').toLowerCase() !== 'off';
+    S.agc = on;
+    emit('AGC '+(on?'ON — AUTOMATIC GENERATION CONTROL':'OFF — MANUAL GOVERNOR'),'ph');
+    emit(on ? 'THE GOVERNOR TRIMS ITSELF TO HOLD 50 Hz. IT IS SLOWER THAN YOU ARE.' : 'YOU HAVE THE GOVERNOR.','dim');
+    soe('GRD','AGC','AGC '+(on?'ON':'OFF'));
+  },
+
   gov(a){
     const v = parseFloat(a[0]);
     if (isNaN(v) || v<0 || v>105){ err('04','INTERLOCK ACTIVE','GOVERNOR 0 - 105 %'); return; }
     S.turbSet = v;
-    print('TURBINE GOVERNOR SETPOINT '+fmt(v,0)+' %', 'ph');
+    emit('TURBINE GOVERNOR SETPOINT '+fmt(v,0)+' %', 'ph');
   },
 
   door(a){
@@ -2089,9 +2237,9 @@ const CMD = {
     const d = BLAST_DOORS.find(x=>x.id===id);
     if (!d){ err('01','TAG NOT FOUND','DOORS: '+BLAST_DOORS.map(x=>x.id).join(' ')); return; }
     if (st!=='OPEN' && st!=='CLOSE'){ err('01','TAG NOT FOUND','USAGE: door <id> <open|close>'); return; }
-    if (d.moving){ print(d.id+' ALREADY MOVING','dim'); return; }
+    if (d.moving){ emit(d.id+' ALREADY MOVING','dim'); return; }
     d.target = st==='OPEN'; d.moving = true; d.t = 0;
-    print(d.id+'  '+(st==='OPEN'?'OPENING':'CLOSING')+'  — 3 SECONDS','ph');
+    emit(d.id+'  '+(st==='OPEN'?'OPENING':'CLOSING')+'  — 3 SECONDS','ph');
     audio.relay(); soe('DOOR', d.id, d.id+' '+st);
   },
 
@@ -2108,7 +2256,7 @@ const CMD = {
     const m = (a[0]||'').toUpperCase();
     const macro = MACROS[m];
     if (!macro){ err('01','TAG NOT FOUND','MACROS: '+Object.keys(MACROS).join(' ')); return; }
-    print('MACRO '+m+' QUEUED — '+macro.length+' COMMANDS', 'warn');
+    emit('MACRO '+m+' QUEUED — '+macro.length+' COMMANDS', 'warn');
     macro.forEach((c,i)=>setTimeout(()=>{ execute(c); }, i*700));
   },
 
@@ -2117,15 +2265,15 @@ const CMD = {
     GAME.signed = b;
     GAME.log.push({t:plantClock(nowMs).slice(0,5), who:b, text:'SIGNED — SHIFT '+GAME.shiftName});
     soe('SGN', b, 'LOG SIGNED FOR SHIFT '+GAME.shiftName);
-    print('LOG SIGNED  '+b+'  '+plantClock(nowMs), 'ph');
+    emit('LOG SIGNED  '+b+'  '+plantClock(nowMs), 'ph');
     audio.bell();
   },
 
   perm(a){
     const t = (a[0]||'').toUpperCase();
     GAME.priv = true;
-    print('CLEARANCE GRANTED  '+GAME.me+'  —  SUPERVISOR AUTHORITY', 'ph');
-    print('BYPASS AND FORCE ARE NOW AVAILABLE. EVERY USE IS LOGGED.','dim');
+    emit('CLEARANCE GRANTED  '+GAME.me+'  —  SUPERVISOR AUTHORITY', 'ph');
+    emit('BYPASS AND FORCE ARE NOW AVAILABLE. EVERY USE IS LOGGED.','dim');
     soe('PRM', t||'—', 'CLEARANCE GRANTED');
     audio.bell();
   }
@@ -2386,7 +2534,7 @@ function buildMimic(){
     if (want && S.turbSpeed<2900){ err('04','INTERLOCK ACTIVE','TURBINE BELOW SYNC SPEED'); return; }
     S.genBrk = want;
     soe('SW','GEN-BRK','GEN-BRK '+(want?'CLOSE':'OPEN')+' /BOARD');
-    print('52-G1  '+(want?'CLOSED':'OPENED')+'  AT THE BOARD','ph');
+    emit('52-G1  '+(want?'CLOSED':'OPENED')+'  AT THE BOARD','ph');
     audio.relay(); shake(2);
   });
 }
@@ -2429,10 +2577,10 @@ function buildSpds(){
         const map = {SUB:['CORE-PWR','ROD-BANK-A'], CC:['RCS-LP1-TH','RCS-LP2-TH','RCP-1','RCP-2'],
           HS:['SG1-LVL','SG2-LVL','FW-1P','FW-2P'], RI:['RCS-PR','RCS-PR-2','PRZ-LVL','PRZ-PR'],
           CT:['CNT-PR','CNT-RAD','CNT-ISO'], IN:['PRZ-LVL','SG1-LVL','SUMP-LVL']};
-        print('CSF '+r.k+'  '+r.name+'  —  '+r.v, 'ph');
+        emit('CSF '+r.k+'  '+r.name+'  —  '+r.v, 'ph');
         (map[r.k]||[]).forEach(t=>{ const p=PIDX[t]; if(!p) return;
           const shown = (p.kind==='state'&&p.stateLabels)?p.stateLabels[p.value?1:0]:fmt(p.value,p.dec);
-          print('   '+t.padEnd(14)+String(shown).padStart(9)+' '+p.unit, 'dim'); });
+          emit('   '+t.padEnd(14)+String(shown).padStart(9)+' '+p.unit, 'dim'); });
       }
     });
     wrap.appendChild(d);
@@ -2494,7 +2642,7 @@ function pressKey(k){
       const hits = POINTS.filter(p=>p.tag.startsWith(pre));
       if (hits.length===1){ SH.buffer = SH.buffer.slice(0, m.index)+hits[0].tag+' '; }
       else if (hits.length>1){
-        print('TAB  '+hits.slice(0,8).map(h=>h.tag).join(' '), 'dim');
+        emit('TAB  '+hits.slice(0,8).map(h=>h.tag).join(' '), 'dim');
       }
     }
     audio.key();
@@ -2850,10 +2998,10 @@ const director = {
     if (st!==this.stage){
       this.stage = st; GAME.stage = st;
       applyDecay(st);
-      if (st===2) print('THE ROOM TONE CHANGES PITCH.','dim');
-      if (st===3) print('A TELEPHONE RINGS SOMEWHERE DOWN THE CORRIDOR.','dim');
-      if (st===4) { audio.toneStart(); print('THE PRINTER RUNS.','dim'); printToPrinter('                       '); }
-      if (st===5) print('','dim');
+      if (st===2) emit('THE ROOM TONE CHANGES PITCH.','dim');
+      if (st===3) emit('A TELEPHONE RINGS SOMEWHERE DOWN THE CORRIDOR.','dim');
+      if (st===4) { audio.toneStart(); emit('THE PRINTER RUNS.','dim'); printToPrinter('                       '); }
+      if (st===5) emit('','dim');
     }
     if (e > this.nextAt){
       this.nextAt = e + rrange(52, 78);
@@ -2872,7 +3020,7 @@ const director = {
         if (a.tag && PIDX[a.tag]){
           S.chanBias = 0.62;
           PIDX[a.tag].inTest = false;
-          print('','dim');
+          emit('','dim');
         }
       }
     });
@@ -2903,12 +3051,12 @@ const director = {
     const a = this.ledger.find(x=>x.tag===tag && !x.explained);
     if (a){ a.explained = true; }
   },
-  onBypass(tag){ print('SOMETHING IN THE CORRIDOR HEARD THAT.','dim'); },
+  onBypass(tag){ emit('SOMETHING IN THE CORRIDOR HEARD THAT.','dim'); },
   onForce(tag,v){
     if (GAME.mode!=='night') return;
     GAME.forced = (GAME.forced||0)+1;
-    print('THE POINT IS NOW '+fmt(v,1)+'. THE PHYSICS DID NOT DO THAT.','dim');
-    if (GAME.forced>=2) setTimeout(()=>{ print('','dim'); print('THE LOG HAS A LINE IN YOUR HANDWRITING THAT YOU DID NOT WRITE.','warn'); }, 2200);
+    emit('THE POINT IS NOW '+fmt(v,1)+'. THE PHYSICS DID NOT DO THAT.','dim');
+    if (GAME.forced>=2) setTimeout(()=>{ emit('','dim'); emit('THE LOG HAS A LINE IN YOUR HANDWRITING THAT YOU DID NOT WRITE.','warn'); }, 2200);
   }
 };
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
@@ -2940,10 +3088,10 @@ const EVENTS = {
     }},
   5:{name:'TELEPHONE', run(){
       audio.bell();
-      print('','dim');
-      print('  TELEPHONE — EXT 4417 — RINGING','warn');
-      print('  SUBTITLE: CALL FROM EXTENSION 4417','dim');
-      setTimeout(()=>{ if(GAME.mode==='night') print('  THE HANDSET IS WARM.','dim'); }, 4000);
+      emit('','dim');
+      emit('  TELEPHONE — EXT 4417 — RINGING','warn');
+      emit('  SUBTITLE: CALL FROM EXTENSION 4417','dim');
+      setTimeout(()=>{ if(GAME.mode==='night') emit('  THE HANDSET IS WARM.','dim'); }, 4000);
       director.note(null,'telephone rang from your own extension');
     }},
   6:{name:'GHOST TAG', run(){
@@ -2953,7 +3101,7 @@ const EVENTS = {
         PIDX['AUX-0-TMP'] = p;
       }
       director.note('AUX-0-TMP','a tag that is not in the drawing set');
-      setTimeout(()=>{ print('  THE POINT LIST HAS ONE MORE LINE THAN IT HAD AT 02:14.','dim'); }, 6000);
+      setTimeout(()=>{ emit('  THE POINT LIST HAS ONE MORE LINE THAN IT HAD AT 02:14.','dim'); }, 6000);
     }},
   7:{name:'IN TEST', run(){
       const p = PIDX['RCS-PR-2'];
@@ -2985,8 +3133,8 @@ const EVENTS = {
   12:{name:'SCRAM', run(){
       audio.bell(); shake(6);
       soe('SCR','—','REACTOR SCRAM');
-      print('  SCRAM.','err');
-      print('  EVERY PARAMETER SAYS THE REACTOR IS FINE.','dim');
+      emit('  SCRAM.','err');
+      emit('  EVERY PARAMETER SAYS THE REACTOR IS FINE.','dim');
       director.note(null,'a scram the board did not see');
     }}
 };
@@ -3096,9 +3244,9 @@ function updateConsoleChrome(quiet){
   b.textContent = away ? '‹ RETURN TO THE BOARD' : 'ROOMS ›';
   b.classList.toggle('away', away);
   if (quiet) return;
-  if (inRoom) print('CONSOLE AT THE COMPUTER ROOM. THE BOARD IS NOT VISIBLE FROM HERE.','sys');
-  else if (away) print('IN THE '+(r?r.name:'CORRIDOR')+'. THE BOARD IS BEHIND YOU.','sys');
-  else print('BACK AT THE BOARD.','sys');
+  if (inRoom) emit('CONSOLE AT THE COMPUTER ROOM. THE BOARD IS NOT VISIBLE FROM HERE.','sys');
+  else if (away) emit('IN THE '+(r?r.name:'CORRIDOR')+'. THE BOARD IS BEHIND YOU.','sys');
+  else emit('BACK AT THE BOARD.','sys');
 }
 
 /* ============================================================
@@ -3143,7 +3291,7 @@ function showProc(){
     <div class="proc-bd">${pr.steps.map((s,i)=>
       `<div class="st ${i+1===GAME.step?'cur':''}"><span class="n">${pad2(i+1)}</span><span>${s}</span></div>`).join('')}</div>
     <div class="proc-ft">
-      <button class="hbtn" id="procClose">CLOSE</button>
+      <button type="button" class="hbtn" id="procClose">CLOSE</button>
       <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:#5A5445">PRINTED 14/03/98 · SUPERSEDES REV 3</span>
     </div></div>`;
   ov.classList.add('on');
@@ -3153,6 +3301,25 @@ function showProc(){
    11. SCREENS
    ============================================================ */
 let stageScale = 1;
+/* a running plant is not a document: refuse the browser's print request */
+const nativePrint = window.print ? window.print.bind(window) : null;
+window.print = function(){
+  if (typeof GAME !== 'undefined' && GAME.running){
+    emit('PRINTING IS DISABLED WHILE THE PLANT IS RUNNING.','warn');
+    return;
+  }
+  if (nativePrint) nativePrint();
+};
+window.addEventListener('beforeprint', ()=>{
+  GAME._wasPaused = GAME.paused;
+  if (GAME.running) GAME.paused = true;
+});
+window.addEventListener('afterprint', ()=>{
+  if (GAME.running && !GAME._wasPaused && !document.querySelector('#ovPause').classList.contains('on')){
+    GAME.paused = false;
+  }
+});
+
 function fit(){
   const v = (typeof effectiveView==='function') ? effectiveView() : 'desktop';
   const st = $('#stage');
@@ -3181,19 +3348,19 @@ function showTitle(){
     <div class="tsub">A real-time operations sim, a social deduction game and an analogue horror story, played through one keypad. You are a licensed reactor operator. The plant does not wait for you to finish typing.</div>
     <div class="tgrid">
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="mode-btn sel" data-mode="sim">
+        <button type="button" class="mode-btn sel" data-mode="sim">
           <h4>SIMULATOR</h4>
           <div class="mdesc">The plant, and nothing else. Cold iron to full power: criticality, rod worth, xenon, boron, on-power refuelling. No horror, no impostor.</div>
         </button>
-        <button class="mode-btn" data-mode="night">
+        <button type="button" class="mode-btn" data-mode="night">
           <h4>NIGHT SHIFT</h4>
           <div class="mdesc">The horror mode. Same plant, and something in the building. Three shifts, about eight minutes each.</div>
         </button>
-        <button class="mode-btn" data-mode="story">
+        <button type="button" class="mode-btn" data-mode="story">
           <h4>STORY</h4>
           <div class="mdesc">Four nights from the record: SL-1, Three Mile Island, Fukushima, Chernobyl. Same plant, real physics, and the briefing is what the shift actually believed.</div>
         </button>
-        <button class="mode-btn" data-mode="crew">
+        <button type="button" class="mode-btn" data-mode="crew">
           <h4>CREW</h4>
           <div class="mdesc">Hidden role, one screen. Three colleagues on the board; the roster lists four names and the log is signed five times. One of them is the Fifth.</div>
         </button>
@@ -3216,9 +3383,9 @@ function showTitle(){
         <option value="240">4 min (drill)</option>
         <option value="120">2 min (walkthrough)</option>
       </select>
-      <button class="btn-sm" id="titleBook">HANDBOOK</button>
-      <button class="btn-sm" id="titleSet">SETTINGS</button>
-      <button class="big-btn" id="startBtn" style="margin-left:auto">BEGIN SHIFT ›</button>
+      <button type="button" class="btn-sm" id="titleBook">HANDBOOK</button>
+      <button type="button" class="btn-sm" id="titleSet">SETTINGS</button>
+      <button type="button" class="big-btn" id="startBtn" style="margin-left:auto">BEGIN SHIFT ›</button>
     </div>
     <div class="trow" style="margin-top:-6px">
       <span style="font-size:10px;letter-spacing:.12em;color:#5F6A73">TYPE ON THE KEYPAD OR YOUR KEYBOARD · TAB COMPLETES TAGS · HIST RECALLS · ESC CLEARS · ENTER DOES NOT EXECUTE — PRESS THE AMBER KEY</span>
@@ -3260,6 +3427,8 @@ function startGame(seed, len){
   GAME.fifth = 1 + Math.floor(rng()*3);
   GAME.proc = null; GAME.step = 1; GAME.bypassed = {};
   GAME.chapter = null; GAME.storyT = 0; GAME.storyResult = null;
+  GAME.gridCollapsed = false; GAME.nextGridEvent = 45;
+  S.gridStep = 0; S.gridShed = 0; S.gridStage = 0; S.gridHz = 50.0;
   const ob = document.getElementById('objBar'); if (ob) ob.classList.add('hidden');
   GAME.room='MCR'; GAME.bunkerSealed=false; GAME.sealing=false; GAME.sealP=0;
   GAME.meltdown=false; GAME.meltdownAt=0; GAME.abandoned=false; GAME.meltdownFailed=false;
@@ -3311,25 +3480,34 @@ function seedLog(n){
 function briefing(n){
   if (GAME.mode==='story') return;
   if (GAME.mode==='sim' && S.rt==='RBMK'){
-    print('','dim');
-    print('=== SIMULATOR — UNIT 4 · RBMK =======================','ph');
-    print('Channel-type, graphite-moderated, boiling light water. 211 control rods, each one yours.', 'dim');
-    print('The reactor is at 200 MWt with the ORM at '+fmt(S.orm,0)+' equivalent rods. The limit is 15.', 'warn');
-    print('ROOMS > MCR IS THE CORE MAP: click a rod, raise it, lower it, or press AZ-5.', 'dim');
-    print('WATCH THE VOID. THE VOID COEFFICIENT IS POSITIVE AND THAT IS NOT A BUG.', 'dim');
-    print('SEED '+SEED+'   PLANT TIME x'+(GAME.plantSpeed||1), 'dim');
-    print('','dim');
+    emit('','dim');
+    emit('=== SIMULATOR — UNIT 4 · RBMK =======================','ph');
+    emit('Channel-type, graphite-moderated, boiling light water. 211 control rods, each one yours.', 'dim');
+    emit('The reactor is at 200 MWt with the ORM at '+fmt(S.orm,0)+' equivalent rods. The limit is 15.', 'warn');
+    emit('ROOMS > MCR IS THE CORE MAP: click a rod, raise it, lower it, or press AZ-5.', 'dim');
+    emit('WATCH THE VOID. THE VOID COEFFICIENT IS POSITIVE AND THAT IS NOT A BUG.', 'dim');
+    emit('SEED '+SEED+'   PLANT TIME x'+(GAME.plantSpeed||1), 'dim');
+    emit('','dim');
     return;
   }
   if (GAME.mode==='sim'){
-    print('','dim');
-    print('=== SIMULATOR — HOT STANDBY =========================','ph');
-    print('The reactor is shutdown, the primary is hot and pressurised, the rods are in.', 'dim');
-    print('Bring it critical, raise power, roll the turbine, close 52-G1 and load the machine.', 'dim');
-    print('ROOMS > MCR IS THE OPERATIONS DESK. THE CHECKLIST THERE TELLS YOU WHAT IS LEFT.', 'dim');
-    print('VERBS: rod, boron, scram, sync, gov, sw, sp, door, fuel', 'dim');
-    print('SEED '+SEED+'   PLANT TIME x'+(GAME.plantSpeed||1), 'dim');
-    print('','dim');
+    emit('','dim');
+    emit('=== SIMULATOR — COLD SHUTDOWN =======================','ph');
+    emit('The reactor is shut down and cold: 60 °C, 20 bar, shutdown cooling in service,', 'dim');
+    emit('rods fully in, boron at 1100 ppm. Nothing is hot and nothing is pressurised.', 'dim');
+    emit('','dim');
+    emit('THE PROCEDURE IS ON THE OPERATIONS DESK (ROOMS > MCR), IN ORDER:', 'warn');
+    emit('  1  verify the margin: boron, rods, shutdown cooling', 'dim');
+    emit('  2  start both coolant pumps, then isolate shutdown cooling', 'dim');
+    emit('  3  heat up to 280 °C — HEAT-UP ON, watch the stress', 'dim');
+    emit('  4  pressurise to 145 bar with the pressuriser heaters', 'dim');
+    emit('  5  dilute the boron, withdraw the rods, find criticality', 'dim');
+    emit('  6  raise power, roll the turbine, close 52-G1, take load', 'dim');
+    emit('','dim');
+    emit('IN A HURRY? PREHEAT ON THE DESK TAKES YOU STRAIGHT TO HOT STANDBY.', 'dim');
+    emit('VERBS: rod, boron, heatup, scram, sync, gov, sw, sp, door, fuel', 'dim');
+    emit('SEED '+SEED+'   PLANT TIME x'+(GAME.plantSpeed||1), 'dim');
+    emit('','dim');
     return;
   }
   const N = {
@@ -3337,16 +3515,16 @@ function briefing(n){
     2:['SHIFT B — UNSUPERVISED.','The log was signed before you sat down. The supervisor has gone to the shift office. Nobody is behind you now.'],
     3:['SHIFT C — THE FIFTH.','The plant is fine. Everything else is not. Sign the log or refuse to.']
   }[n];
-  print('','dim');
-  print('=== '+N[0]+' ===========================================','ph');
-  print(N[1],'dim');
-  print('SEED '+SEED+'   SHIFT LENGTH '+Math.round(GAME.shiftLen/60)+' MIN   BADGE '+GAME.me,'dim');
-  print('help FOR THE VERB LIST. READ VERBS WORK AT THIS DESK.','dim');
+  emit('','dim');
+  emit('=== '+N[0]+' ===========================================','ph');
+  emit(N[1],'dim');
+  emit('SEED '+SEED+'   SHIFT LENGTH '+Math.round(GAME.shiftLen/60)+' MIN   BADGE '+GAME.me,'dim');
+  emit('help FOR THE VERB LIST. READ VERBS WORK AT THIS DESK.','dim');
   if (n===1){
-    print('','dim');
-    print('A PRINTED PROCEDURE IS ON THE DESK: proc P-1','dim');
+    emit('','dim');
+    emit('A PRINTED PROCEDURE IS ON THE DESK: proc P-1','dim');
   }
-  if (GAME.mode==='crew' && n>=2) print('ONE OF THE BADGES ON THIS SHIFT IS NOT ON THE ROSTER.','warn');
+  if (GAME.mode==='crew' && n>=2) emit('ONE OF THE BADGES ON THIS SHIFT IS NOT ON THE ROSTER.','warn');
 }
 
 /* ---------- review ---------- */
@@ -3363,7 +3541,7 @@ function showReview(){
   const crewBtns = GAME.mode==='crew'
     ? `<div style="margin-top:14px;font-size:10px;letter-spacing:.16em;color:var(--steel-lt)">NAME ONE PERSON RELIEVED OF DUTY</div>
        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-         ${CREW_NAMES.slice(0,4).map((c,i)=>`<button class="hbtn" data-acc="${i}">${c.name}</button>`).join('')}
+         ${CREW_NAMES.slice(0,4).map((c,i)=>`<button type="button" class="hbtn" data-acc="${i}">${c.name}</button>`).join('')}
        </div>` : '';
   ov.innerHTML = `
     <div class="card">
@@ -3382,8 +3560,8 @@ function showReview(){
         </div>
       </div>
       <div class="card-ft">
-        <button class="big-btn" id="signBtn">SIGN THE LOG</button>
-        <button class="big-btn ghost" id="refuseBtn">REFUSE TO SIGN</button>
+        <button type="button" class="big-btn" id="signBtn">SIGN THE LOG</button>
+        <button type="button" class="big-btn ghost" id="refuseBtn">REFUSE TO SIGN</button>
         <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--steel-lt)">SEED ${SEED} · SHIFT ${GAME.shiftName}</span>
       </div>
     </div>`;
@@ -3439,8 +3617,8 @@ function endGame(kind, accused){
           <div>SEED<br><span style="color:var(--paper);font-size:calc(var(--fs)*15px)">${SEED}</span></div>
         </div>
       </div>
-      <div class="card-ft"><button class="big-btn" id="againBtn3">NEW SESSION</button>
-        <button class="big-btn ghost" id="titleBtn3">TITLE</button></div>
+      <div class="card-ft"><button type="button" class="big-btn" id="againBtn3">NEW SESSION</button>
+        <button type="button" class="big-btn ghost" id="titleBtn3">TITLE</button></div>
     </div>`;
     ov.classList.add('on');
     $('#againBtn3').addEventListener('click', ()=>{ ov.classList.remove('on'); startGame(SEED, GAME.shiftLenOpt); });
@@ -3475,8 +3653,8 @@ function endGame(kind, accused){
           watch what you stopped reading.
         </div>
       </div>
-      <div class="card-ft"><button class="big-btn" id="againBtn">RUN AGAIN</button>
-        <button class="big-btn ghost" id="titleBtn">TITLE</button></div>
+      <div class="card-ft"><button type="button" class="big-btn" id="againBtn">RUN AGAIN</button>
+        <button type="button" class="big-btn ghost" id="titleBtn">TITLE</button></div>
     </div>`;
   ov.classList.add('on');
   $('#againBtn').addEventListener('click', ()=>{ ov.classList.remove('on'); startGame(SEED, GAME.shiftLenOpt); });
@@ -3496,13 +3674,13 @@ function showPause(){
       <div class="prow"><div class="toggle ${document.body.classList.contains('reduced-flash')?'on':''}" id="tFlash"><i></i></div> REDUCE FLASHING (1 Hz, no hard cut)</div>
       <div class="prow"><div class="toggle ${GAME.enterExec?'on':''}" id="tEnter"><i></i></div> ENTER EXECUTES (default off, deliberately)</div>
       <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="btn-sm" id="pauseSet">SETTINGS</button>
-        <button class="btn-sm" id="pauseBook">HANDBOOK</button>
+        <button type="button" class="btn-sm" id="pauseSet">SETTINGS</button>
+        <button type="button" class="btn-sm" id="pauseBook">HANDBOOK</button>
       </div>
       <div style="display:flex;gap:10px;margin-top:6px">
-        <button class="big-btn" id="resumeBtn">RESUME</button>
-        <button class="big-btn ghost" id="endBtn">END SESSION</button>
-        <button class="big-btn ghost" id="quitBtn">QUIT TO TITLE</button>
+        <button type="button" class="big-btn" id="resumeBtn">RESUME</button>
+        <button type="button" class="big-btn ghost" id="endBtn">END SESSION</button>
+        <button type="button" class="big-btn ghost" id="quitBtn">QUIT TO TITLE</button>
       </div>
     </div>`;
   ov.classList.add('on');
@@ -3522,11 +3700,17 @@ function escapeHtml(s){ return String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':
    12. INPUT
    ============================================================ */
 window.addEventListener('keydown', e=>{
+  /* the browser's print shortcut would put a dialog over a running plant */
+  if ((e.ctrlKey||e.metaKey) && (e.key==='p'||e.key==='P')){
+    e.preventDefault(); e.stopPropagation();
+    if (GAME.running) emit('PRINTING IS DISABLED WHILE THE PLANT IS RUNNING.','warn');
+    return;
+  }
   const tag = (e.target.tagName||'').toUpperCase();
   if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
   if ($('#ovTitle').classList.contains('on') || $('#ovReview').classList.contains('on') ||
       $('#ovEnd').classList.contains('on') || $('#ovBook').classList.contains('on') ||
-      $('#ovSettings').classList.contains('on')) return;
+      $('#ovSettings').classList.contains('on') || $('#ovChapters').classList.contains('on')) return;
   if (e.key==='Tab'){ e.preventDefault(); pressKey('TAB'); return; }
   if (e.key==='Backspace'){ e.preventDefault(); pressKey('DEL'); return; }
   if (e.key==='Escape'){ pressKey('ESC'); return; }
@@ -3591,14 +3775,14 @@ function renderSettings(){
       <div class="set-row">
         <div class="set-lab">VIEW MODE</div>
         <div class="seg" id="segView">
-          ${['auto','desktop','responsive','mobile'].map(v=>`<button data-v="${v}" class="${SET.view===v?'sel':''}">
+          ${['auto','desktop','responsive','mobile'].map(v=>`<button type="button" data-v="${v}" class="${SET.view===v?'sel':''}">
             <b>${v.toUpperCase()}</b><small>${VIEW_HELP[v]}</small></button>`).join('')}
         </div>
         <div class="set-help">AUTO PICKS MOBILE ON PHONES AND SMALL PORTRAIT SCREENS, RESPONSIVE ON TABLETS AND SMALL LAPTOPS, AND THE FIXED 1600 × 900 BOARD ON A DESKTOP.</div>
       </div>
       <div class="set-row">
         <div class="set-lab">TEXT SIZE</div>
-        <div class="seg" id="segFs">${FSS.map(f=>`<button data-f="${f.v}" class="${SET.fs===f.v?'sel':''}">
+        <div class="seg" id="segFs">${FSS.map(f=>`<button type="button" data-f="${f.v}" class="${SET.fs===f.v?'sel':''}">
           <b>${f.l}</b><small>${f.n}</small></button>`).join('')}</div>
         <div class="fs-preview">
           <div class="u">ANNUNCIATOR · PTY-1 · SHIFT B</div>
@@ -3610,7 +3794,7 @@ function renderSettings(){
       <div class="set-row">
         <div class="set-lab">PLANT TIME</div>
         <div class="seg" id="segPlant">${[{v:1,l:'×1',n:'REAL PACE'},{v:3,l:'×3',n:'FASTER'},{v:8,l:'×8',n:'TRAINING'}].map(f=>
-          `<button data-p="${f.v}" class="${(SET.plant||1)===f.v?'sel':''}"><b>${f.l}</b><small>${f.n}</small></button>`).join('')}</div>
+          `<button type="button" data-p="${f.v}" class="${(SET.plant||1)===f.v?'sel':''}"><b>${f.l}</b><small>${f.n}</small></button>`).join('')}</div>
         <div class="set-help">HOW FAST THE REACTOR ITSELF RUNS. ×1 IS A REAL HEAT-UP; ×8 TURNS A COLD START INTO TEN MINUTES.</div>
       </div>
       <div class="set-row">
@@ -3620,14 +3804,14 @@ function renderSettings(){
           <div class="set-tog" data-tog="flash"><div class="toggle ${SET.flash?'on':''}"><i></i></div> REDUCE FLASHING</div>
           <div class="set-tog" data-tog="enter"><div class="toggle ${SET.enter?'on':''}"><i></i></div> ENTER EXECUTES</div>
           <div class="set-tog" data-tog="geiger"><div class="toggle ${SET.geiger?'on':''}"><i></i></div> GEIGER COUNTER</div>
-          <button class="set-tog" data-tog="reset" style="justify-content:center;letter-spacing:.14em">RESET TO DEFAULTS</button>
+          <button type="button" class="set-tog" data-tog="reset" style="justify-content:center;letter-spacing:.14em">RESET TO DEFAULTS</button>
         </div>
         <div class="set-help">ENTER IS DELIBERATELY OFF: THE PAUSE BETWEEN THE ECHO AND THE AMBER KEY IS WHERE THE TENSION LIVES.</div>
       </div>
     </div>
     <div class="card-ft">
-      <button class="big-btn" id="setDone">DONE</button>
-      <button class="big-btn ghost" id="setBook">HANDBOOK</button>
+      <button type="button" class="big-btn" id="setDone">DONE</button>
+      <button type="button" class="big-btn ghost" id="setBook">HANDBOOK</button>
       <span style="margin-left:auto;font-family:var(--mono);font-size:calc(var(--fs)*9px);color:var(--steel-lt)">SECOND SHIFT · SETTINGS</span>
     </div>
   </div>`;
@@ -3669,7 +3853,7 @@ let mobTab = 'ann';
 function buildMobTabs(){
   const bar = $('#mobTabs');
   if (!bar) return;
-  bar.innerHTML = MOB_TABS.map(t=>`<button data-tab="${t.id}" class="${mobTab===t.id?'on':''}">${t.l}</button>`).join('');
+  bar.innerHTML = MOB_TABS.map(t=>`<button type="button" data-tab="${t.id}" class="${mobTab===t.id?'on':''}">${t.l}</button>`).join('');
   bar.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
     if (b.dataset.tab==='desk'){ openRooms(); return; }
     setMobTab(b.dataset.tab);
@@ -3799,7 +3983,7 @@ function currentDoorX(){
 }
 function openRooms(){
   if (!GAME.running){ return; }
-  if (GAME.bunkerSealed && GAME.room==='BUNKER'){ print('THE HATCH IS SEALED. YOU ARE NOT LEAVING.','err'); return; }
+  if (GAME.bunkerSealed && GAME.room==='BUNKER'){ emit('THE HATCH IS SEALED. YOU ARE NOT LEAVING.','err'); return; }
   $('#ovRooms').classList.add('on');
   drawRooms();
 }
@@ -3819,11 +4003,11 @@ function drawRooms(){
 function travelTo(id){
   if (!GAME.running || GAME.paused || trip.active) return;
   if (GAME.room===id){ if (id==='MCR') $('#ovRooms').classList.remove('on'); return; }
-  if (GAME.bunkerSealed){ print('THE HATCH IS SEALED. YOU ARE NOT LEAVING.','err'); return; }
+  if (GAME.bunkerSealed){ emit('THE HATCH IS SEALED. YOU ARE NOT LEAVING.','err'); return; }
   if (id === 'COMP' && compDose() > 1.0){
     err('04','INTERLOCK ACTIVE','COMPUTER ROOM DOSE RATE '+fmt(compDose(),2)+' mSv/h');
-    print('THE MONITOR ON THE DOOR IS OVER ITS SETPOINT. THE CONSOLE IS LOST.','dim');
-    print('THE BACKUP CONSOLE IN THE POWER ROOM STILL WORKS, AND SO DOES THE ANALOG ANNEX.','dim');
+    emit('THE MONITOR ON THE DOOR IS OVER ITS SETPOINT. THE CONSOLE IS LOST.','dim');
+    emit('THE BACKUP CONSOLE IN THE POWER ROOM STILL WORKS, AND SO DOES THE ANALOG ANNEX.','dim');
     audio.beep('crit');
     return;
   }
@@ -3832,7 +4016,7 @@ function travelTo(id){
   const shut = doorBlocked(a.id, b.id);
   if (shut.length){
     err('04','INTERLOCK ACTIVE','BLAST DOOR '+shut.map(d=>d.id).join(' AND ')+' IS CLOSED');
-    print('OPEN IT ON THE MAP, OR: door '+shut[0].id+' open','dim');
+    emit('OPEN IT ON THE MAP, OR: door '+shut[0].id+' open','dim');
     return;
   }
   trip.active = true; trip.t = 0; trip.from = a.x; trip.to = b.x; trip.target = id;
@@ -3865,7 +4049,7 @@ function updateTravel(dt){
     } else {
       drawRooms();
       const r = ROOM_LIST.find(x=>x.id===GAME.room);
-      print('IN THE '+r.name+'.','sys');
+      emit('IN THE '+r.name+'.','sys');
     }
     audio.setRoom(0.05);
   }
@@ -3878,8 +4062,8 @@ function renderRoomPanel(){
   if (!r){ el.innerHTML=''; return; }
   const view = ROOM_VIEWS[GAME.room];
   const nav = `<div class="room-nav">${ROOM_LIST.map(x=>
-      `<button class="btn-sm ${GAME.room===x.id?'go':''}" data-act="walk" data-arg="${x.id}">${x.short}</button>`).join('')}
-    <button class="btn-sm" data-act="close" style="margin-left:auto">CLOSE MAP</button></div>`;
+      `<button type="button" class="btn-sm ${GAME.room===x.id?'go':''}" data-act="walk" data-arg="${x.id}">${x.short}</button>`).join('')}
+    <button type="button" class="btn-sm" data-act="close" style="margin-left:auto">CLOSE MAP</button></div>`;
   el.innerHTML = nav + (view ? view() : '<div class="room-hd"><h2>'+r.name+'</h2></div>');
   if (S.rt==='RBMK') bindRodEls();
 }
@@ -3894,7 +4078,7 @@ function switchCard(tag){
 function taggedList(){
   const t = POINTS.filter(p=>p.inTest && p.tier!=='C');
   if (!t.length) return '<div style="color:#4E5A63">NOTHING TAGGED OUT</div>';
-  return t.map(p=>`<div>${p.tag}<button data-act="untag" data-arg="${p.tag}">RETURN</button></div>`).join('');
+  return t.map(p=>`<div>${p.tag}<button type="button" data-act="untag" data-arg="${p.tag}">RETURN</button></div>`).join('');
 }
 function tagOptions(){
   return POINTS.filter(p=>p.tier!=='C').map(p=>`<option value="${p.tag}">${p.tag} — ${p.caption}</option>`).join('');
@@ -3934,6 +4118,15 @@ function tickChecklist(){
 }
 function resetChecklist(){ STARTUP_STEPS.forEach(st=>st.done = false); STEPS_RBMK.forEach(st=>st.done = false); }
 function activeSteps(){ return S.rt==='RBMK' ? STEPS_RBMK : STARTUP_STEPS; }
+function preheatPlant(){
+  setPlant('hotstandby');
+  S.heatup = false; S.stress = 0; S.shockDone = false;
+  resetChecklist();
+  emit('','dim');
+  emit('PREHEAT COMPLETE. PRIMARY AT 290 °C AND 152 bar, RODS IN, PUMPS RUNNING.','ph');
+  emit('THE HEAT-UP HAS BEEN SKIPPED. THE CHECKLIST RESUMES AT CIRCULATION.','dim');
+  audio.relay(); audio.beep('ack');
+}
 function opsPanel(){
   if (S.rt==='RBMK') return rbmkOpsPanel();
   const ph = plantPhase();
@@ -3954,31 +4147,58 @@ function opsPanel(){
       <div class="rod-lab">REG</div>
       <div class="rod-bar"><i style="width:${S.rodPos.toFixed(1)}%"></i></div>
       <div class="rod-val">${fmt(S.rodPos,1)}%</div>
-      <button class="btn-sm" data-act="rod" data-arg="reg_down">−</button>
-      <button class="btn-sm" data-act="rod" data-arg="reg_up">+</button>
-      <button class="btn-sm ${S.rodAuto?'go':''}" data-act="rod" data-arg="auto">AUTO</button>
+      <button type="button" class="btn-sm" data-act="rod" data-arg="reg_down">−</button>
+      <button type="button" class="btn-sm" data-act="rod" data-arg="reg_up">+</button>
+      <button type="button" class="btn-sm ${S.rodAuto?'go':''}" data-act="rod" data-arg="auto">AUTO</button>
     </div>
     <div class="rod-row">
       <div class="rod-lab">ADJ</div>
       <div class="rod-bar"><i style="width:${S.rodAdj.toFixed(1)}%"></i></div>
       <div class="rod-val">${fmt(S.rodAdj,1)}%</div>
-      <button class="btn-sm" data-act="rod" data-arg="adj_down">−</button>
-      <button class="btn-sm" data-act="rod" data-arg="adj_up">+</button>
-      <button class="btn-sm warn" data-act="scram">SCRAM</button>
+      <button type="button" class="btn-sm" data-act="rod" data-arg="adj_down">−</button>
+      <button type="button" class="btn-sm" data-act="rod" data-arg="adj_up">+</button>
+      <button type="button" class="btn-sm warn" data-act="scram">SCRAM</button>
     </div>
     <div class="rod-row">
       <div class="rod-lab">BORON</div>
       <div class="rod-bar b"><i style="width:${(S.boron/16).toFixed(1)}%"></i></div>
       <div class="rod-val">${fmt(S.boron,0)} ppm</div>
-      <button class="btn-sm" data-act="boron" data-arg="-40">DILUTE</button>
-      <button class="btn-sm" data-act="boron" data-arg="40">BORATE</button>
+      <button type="button" class="btn-sm" data-act="boron" data-arg="-40">DILUTE</button>
+      <button type="button" class="btn-sm" data-act="boron" data-arg="40">BORATE</button>
+    </div>
+  </div>
+  <div class="room-sec">
+    <h4>HEAT-UP AND PRESSURISATION</h4>
+    <div class="rod-row">
+      <div class="rod-lab">TAVG</div>
+      <div class="rod-bar h"><i style="width:${clamp(S.tavg/300*100,0,100).toFixed(1)}%"></i></div>
+      <div class="rod-val">${fmt(S.tavg,0)} °C</div>
+      <button class="btn-sm ${S.heatup?'go':''}" data-act="heatup">${S.heatup?'HEAT-UP ON':'HEAT-UP OFF'}</button>
+      <button class="btn-sm" data-act="heatrate">${S.heatRateUp>0.8?'FAST':'SLOW'}</button>
+    </div>
+    <div class="rod-row">
+      <div class="rod-lab">STRESS</div>
+      <div class="rod-bar s"><i style="width:${clamp((S.stress||0)/120*100,0,100).toFixed(1)}%"></i></div>
+      <div class="rod-val">${fmt(S.stress||0,0)} %</div>
+      <button class="btn-sm" data-act="preheat">PREHEAT</button>
+      <span style="font-size:calc(var(--fs)*8.5px);color:var(--steel-lt);letter-spacing:.06em">
+        ${S.heatup?'HEATING':'IDLE'} · ${fmt(S.heatRateUp,2)} °C/s</span>
     </div>
   </div>
   <div class="room-sec">
     <h4>STARTUP CHECKLIST — ${done} / ${STARTUP_STEPS.length}</h4>
-    <div class="check-grid">
-      ${STARTUP_STEPS.map((st,i)=>`<div class="chk ${st.done?'ok':''}">
-        <span class="box">${st.done?'✓':''}</span><span>${pad2(i+1)} ${st.t}</span></div>`).join('')}
+    <div class="proc-list">
+      ${(()=>{
+        let out='', last='', n=0, curSet=false;
+        STARTUP_STEPS.forEach(st=>{
+          if (st.ph!==last){ last=st.ph; out+=`<div class="proc-phase">${st.ph}</div>`; }
+          n++;
+          const cur = !st.done && !curSet; if (cur) curSet = true;
+          out += `<div class="chk ${st.done?'ok':''} ${cur?'cur':''}">
+            <span class="box">${st.done?'✓':''}</span><span>${pad2(n)} ${st.t}</span></div>`;
+        });
+        return out;
+      })()}
     </div>
   </div>
   <div class="room-sec">
@@ -3991,13 +4211,13 @@ function opsPanel(){
       <div class="ops-metric"><span>LOAD</span><b>${fmt(S.turbLoad,0)}</b><i>MWe</i></div>
     </div>
     <div class="room-row" style="margin-top:8px">
-      <button class="btn-sm" data-act="ops_sw" data-arg="RCP-1">RCP 1 ${S.rcp1?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="RCP-2">RCP 2 ${S.rcp2?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FW 1 ${S.fw1?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FW 2 ${S.fw2?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
-      <button class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC 52-G1'}</button>
-      <button class="btn-sm ${S.porvClosed?'':'warn'}" data-act="porv">PORV ${S.porvClosed?'SHUT':'OPEN'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="RCP-1">RCP 1 ${S.rcp1?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="RCP-2">RCP 2 ${S.rcp2?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FW 1 ${S.fw1?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FW 2 ${S.fw2?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
+      <button type="button" class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC 52-G1'}</button>
+      <button type="button" class="btn-sm ${S.porvClosed?'':'warn'}" data-act="porv">PORV ${S.porvClosed?'SHUT':'OPEN'}</button>
     </div>
   </div>`;
 }
@@ -4072,13 +4292,13 @@ function rbmkOpsPanel(){
         SELECTED ${sel?('ROD '+(sel.i+1)+' · '+sel.type):'—'} · <b id="rmSel" style="color:var(--paper)">${sel?sel.d.toFixed(0)+'%':'—'}</b></span>
     </div>
     <div class="room-row" style="margin-top:6px">
-      <button class="btn-sm" data-act="rodmove" data-arg="-1.5">RAISE ▲</button>
-      <button class="btn-sm" data-act="rodmove" data-arg="1.5">LOWER ▼</button>
-      <button class="btn-sm" data-act="rodset" data-arg="0">FULL OUT</button>
-      <button class="btn-sm" data-act="rodset" data-arg="100">FULL IN</button>
-      <button class="btn-sm" data-act="rodgrp" data-arg="AR">AR GROUP</button>
-      <button class="btn-sm" data-act="rodgrp" data-arg="AZ">AZ GROUP</button>
-      <button class="btn-sm warn" data-act="az5">AZ-5</button>
+      <button type="button" class="btn-sm" data-act="rodmove" data-arg="-1.5">RAISE ▲</button>
+      <button type="button" class="btn-sm" data-act="rodmove" data-arg="1.5">LOWER ▼</button>
+      <button type="button" class="btn-sm" data-act="rodset" data-arg="0">FULL OUT</button>
+      <button type="button" class="btn-sm" data-act="rodset" data-arg="100">FULL IN</button>
+      <button type="button" class="btn-sm" data-act="rodgrp" data-arg="AR">AR GROUP</button>
+      <button type="button" class="btn-sm" data-act="rodgrp" data-arg="AZ">AZ GROUP</button>
+      <button type="button" class="btn-sm warn" data-act="az5">AZ-5</button>
     </div>
     ${rbmkArrayHTML()}
     <div class="rbmk-key">
@@ -4111,12 +4331,12 @@ function rbmkOpsPanel(){
       <div class="ops-metric"><span>LOAD</span><b>${fmt(S.turbLoad,0)}</b><i>MWe</i></div>
     </div>
     <div class="room-row" style="margin-top:8px">
-      <button class="btn-sm" data-act="ops_sw" data-arg="RCP-1">PUMP 1 ${S.rcp1?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="RCP-2">PUMP 2 ${S.rcp2?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FW 1 ${S.fw1?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FW 2 ${S.fw2?'STOP':'START'}</button>
-      <button class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
-      <button class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="RCP-1">PUMP 1 ${S.rcp1?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="RCP-2">PUMP 2 ${S.rcp2?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FW 1 ${S.fw1?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FW 2 ${S.fw2?'STOP':'START'}</button>
+      <button type="button" class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
+      <button type="button" class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC'}</button>
     </div>
   </div>`;
 }
@@ -4140,16 +4360,17 @@ const REFUEL = {active:false, ch:0, step:0, t:0,
          'PUSH FRESH BUNDLES','RETRACT AND SEAL','DISCONNECT','LOG THE EXCHANGE']};
 function pad3(n){ return String(n).padStart(3,'0'); }
 function startRefuel(n){
-  if (REFUEL.active){ print('A FUELLING MACHINE IS ALREADY IN A CHANNEL','dim'); return; }
-  if (S.bundles <= 0){ err('31','NO RESPONSE','NO SPARE BUNDLES IN THE BAY'); return; }
+  if (REFUEL.active){ emit('A FUELLING MACHINE IS ALREADY IN A CHANNEL','dim'); return; }
+  if (S.bundles < 8){ err('31','NO RESPONSE','NOT ENOUGH SPARE BUNDLES — NEED 8'); return; }
   const ch = S.channels[n-1];
   if (!ch){ err('01','TAG NOT FOUND','NO SUCH CHANNEL'); return; }
-  if (ch.b < 0.20){ print('CHANNEL '+n+' IS TOO FRESH — BURNUP '+fmt(ch.b*100,0)+'%','dim'); return; }
+  if (ch.b < 0.20){ emit('CHANNEL '+n+' IS TOO FRESH — BURNUP '+fmt(ch.b*100,0)+'%','dim'); return; }
   if (!S.rcp1 || !S.rcp2){ err('04','INTERLOCK ACTIVE','BOTH COOLANT PUMPS MUST BE RUNNING'); return; }
+  if (Math.abs(S.ao) > 9){ err('04','INTERLOCK ACTIVE','AXIAL OFFSET '+fmt(S.ao,1)+' % — FLATTEN THE FLUX FIRST'); return; }
   REFUEL.active = true; REFUEL.ch = n; REFUEL.step = 0; REFUEL.t = 0;
-  print('','dim');
-  print('REFUELLING CHANNEL '+pad3(n)+'  — BURNUP '+fmt(ch.b*100,0)+'%','ph');
-  print('MACHINES A AND B ON THE CHANNEL FACE. THE REACTOR KEEPS RUNNING.','dim');
+  emit('','dim');
+  emit('REFUELLING CHANNEL '+pad3(n)+'  — BURNUP '+fmt(ch.b*100,0)+'%','ph');
+  emit('MACHINES A AND B ON THE CHANNEL FACE. THE REACTOR KEEPS RUNNING.','dim');
   soe('FUL','CH-'+pad3(n),'REFUELLING STARTED');
   audio.relay();
 }
@@ -4160,35 +4381,45 @@ function fuelTick(dt){
   REFUEL.t = 0;
   REFUEL.step++;
   if (REFUEL.step < REFUEL.steps.length){
-    print('  '+REFUEL.steps[REFUEL.step],'dim');
+    emit('  '+REFUEL.steps[REFUEL.step],'dim');
     audio.printer(2);
     return;
   }
   REFUEL.active = false;
   const ch = S.channels[REFUEL.ch-1];
+  const before = S.avgBurn;
+  const dirTxt = ch.dir > 0 ? 'A TO B' : 'B TO A';
   ch.b = 0.05;
-  S.bundles--;
-  S.fuelRho = (S.fuelRho||0) + 6;
-  print('CHANNEL '+pad3(REFUEL.ch)+' REFUELLED. FRESH FUEL IN THE CORE.','ph');
-  print('REACTIVITY ADDED — TRIM WITH THE RODS OR THE BORON.','warn');
-  soe('FUL','CH-'+pad3(REFUEL.ch),'REFUELLED — 12 BUNDLES EXCHANGED');
+  ch.dir = -ch.dir;                       /* alternate, or the flux tilts */
+  S.bundles -= 8;
+  S.ao = clamp(S.ao + (ch.dir > 0 ? -0.5 : 0.5), -12, 12);
+  let sum = 0; for (const c of S.channels) sum += c.b;
+  S.avgBurn = sum/Math.max(1,S.channels.length);
+  S.burnRho = -2500*(S.avgBurn - 0.55);
+  const gained = (before - S.avgBurn)*2500;
+  emit('CHANNEL '+pad3(REFUEL.ch)+' REFUELLED — 8 BUNDLES, DIRECTION '+dirTxt,'ph');
+  emit('REACTIVITY RECOVERED  +'+fmt(gained,1)+' pcm   AXIAL OFFSET '+fmt(S.ao,1)+' %','dim');
+  emit('TRIM WITH THE RODS OR THE BORON.','warn');
+  soe('FUL','CH-'+pad3(REFUEL.ch),'REFUELLED 8 BUNDLES '+dirTxt);
   audio.relay(); shake(1);
   if (GAME.room==='FUEL') renderRoomPanel();
 }
 function fuelStatus(){
   const avg = S.channels.reduce((a,c)=>a+c.b,0)/306;
-  print('FUEL STATUS','ph');
-  print('  CHANNELS            306');
-  print('  AVERAGE BURNUP      '+fmt(avg*100,1)+' %');
-  print('  CHANNELS OVER 85 %  '+S.channels.filter(c=>c.b>0.85).length);
-  print('  SPARE BUNDLES       '+S.bundles);
-  print('  REFUELLING          '+(REFUEL.active?'IN PROGRESS — CH '+pad3(REFUEL.ch):'IDLE'));
+  emit('FUEL STATUS','ph');
+  emit('  CHANNELS            306');
+  emit('  AVERAGE BURNUP      '+fmt(avg*100,1)+' %');
+  emit('  CHANNELS OVER 85 %  '+S.channels.filter(c=>c.b>0.85).length);
+  emit('  AXIAL OFFSET        '+fmt(S.ao,1)+' %');
+  emit('  BURNUP REACTIVITY   '+fmt(S.burnRho,0)+' pcm');
+  emit('  SPARE BUNDLES       '+S.bundles);
+  emit('  REFUELLING          '+(REFUEL.active?'IN PROGRESS — CH '+pad3(REFUEL.ch):'IDLE'));
 }
 function fuelList(){
   const top = S.channels.slice().sort((a,b)=>b.b-a.b).slice(0,10);
-  print('CHANNELS WITH THE HIGHEST BURNUP','ph');
-  top.forEach(c=>print('  CH-'+pad3(c.ch)+'   '+fmt(c.b*100,1)+' %',''));
-  print('REFUEL WITH: fuel <channel>','dim');
+  emit('CHANNELS WITH THE HIGHEST BURNUP','ph');
+  top.forEach(c=>emit('  CH-'+pad3(c.ch)+'   '+fmt(c.b*100,1)+' %',''));
+  emit('REFUEL WITH: fuel <channel>','dim');
 }
 function fuelGrid(){
   let cells = '';
@@ -4204,13 +4435,13 @@ function fuelGrid(){
 
 /* ---------- synchronise ---------- */
 function doSync(){
-  if (S.genBrk){ print('GENERATOR ALREADY ON THE GRID','dim'); return false; }
+  if (S.genBrk){ emit('GENERATOR ALREADY ON THE GRID','dim'); return false; }
   if (!S.msiv){ err('04','INTERLOCK ACTIVE','MSIV CLOSED — NO STEAM'); return false; }
   if (S.turbSpeed < 2900){ err('04','INTERLOCK ACTIVE','TURBINE AT '+fmt(S.turbSpeed,0)+' rpm — NEED 2900'); return false; }
   if (S.sg1Press < 15){ err('04','INTERLOCK ACTIVE','STEAM PRESSURE TOO LOW TO CARRY LOAD'); return false; }
   S.genBrk = true;
   soe('SW','GEN-BRK','52-G1 CLOSED — GENERATOR ON THE GRID');
-  print('52-G1 CLOSED. THE MACHINE IS ON THE GRID.','ph');
+  emit('52-G1 CLOSED. THE MACHINE IS ON THE GRID.','ph');
   audio.relay(); shake(2);
   return true;
 }
@@ -4222,9 +4453,9 @@ function doScram(reason){
   S.rodTarget = 0; S.rodAdjTarget = 0;
   S.genBrk = false;
   soe('SCR','SDS','REACTOR SCRAM — '+reason);
-  print('','dim');
-  print('  SCRAM.  '+reason,'err');
-  print('  ALL SHUTOFF RODS DROPPING. TURBINE TRIPPED.','dim');
+  emit('','dim');
+  emit('  SCRAM.  '+reason,'err');
+  emit('  ALL SHUTOFF RODS DROPPING. TURBINE TRIPPED.','dim');
   printToPrinter('*** REACTOR SCRAM ***');
   audio.bell(); audio.beep('crit'); shake(6);
   GAME.log.push({t:plantClock(nowMs).slice(0,5), who:GAME.me, text:'SCRAM — '+reason});
@@ -4249,12 +4480,19 @@ const ROOM_VIEWS = {
         <span><i style="background:#E0392B"></i>&gt;85%</span>
         <span style="margin-left:auto">AVG ${fmt(avg*100,1)}% · BUNDLES ${S.bundles}</span>
       </div>
+      <div class="ops-top" style="margin-top:8px">
+        <div class="ops-metric ${Math.abs(S.ao)>6?'bad':''}"><span>AXIAL OFFSET</span><b>${fmt(S.ao,1)}</b><i>%</i></div>
+        <div class="ops-metric"><span>BURNUP REACTIVITY</span><b>${fmt(S.burnRho,0)}</b><i>pcm</i></div>
+        <div class="ops-metric"><span>CHANNELS OVER 85 %</span><b>${S.channels.filter(c=>c.b>0.85).length}</b><i></i></div>
+        <div class="ops-metric"><span>SPARE BUNDLES</span><b>${S.bundles}</b><i>8 per channel</i></div>
+        <div class="ops-metric"><span>MACHINES</span><b>${REFUEL.active?'IN CHANNEL':'READY'}</b><i></i></div>
+      </div>
     </div>
     <div class="room-sec">
       <h4>FUELLING SEQUENCE</h4>
       <div class="room-row">
         <select id="chSel">${Array.from({length:306},(_,i)=>`<option value="${i+1}">CH-${pad3(i+1)} · ${fmt(S.channels[i].b*100,0)}%</option>`).join('')}</select>
-        <button class="btn-sm go" data-act="refuel">START REFUEL</button>
+        <button type="button" class="btn-sm go" data-act="refuel">START REFUEL</button>
         <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt)">THE REACTOR KEEPS RUNNING. THAT IS THE POINT OF THIS MACHINE.</span>
       </div>
       <div class="refuel-steps">
@@ -4277,16 +4515,36 @@ const ROOM_VIEWS = {
     </div>
     <div class="room-sec"><h4>CONTROLS</h4>
       <div class="room-row">
-        <button class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
-        <button class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC 52-G1'}</button>
-        <button class="btn-sm" data-act="gov" data-arg="-5">GOV −5%</button>
-        <button class="btn-sm" data-act="gov" data-arg="5">GOV +5%</button>
+        <button type="button" class="btn-sm" data-act="ops_sw" data-arg="MSIV-1">MSIV ${S.msiv?'CLOSE':'OPEN'}</button>
+        <button type="button" class="btn-sm ${S.genBrk?'go':''}" data-act="sync">${S.genBrk?'ON GRID':'SYNC 52-G1'}</button>
+        <button type="button" class="btn-sm" data-act="gov" data-arg="-5">GOV −5%</button>
+        <button type="button" class="btn-sm" data-act="gov" data-arg="5">GOV +5%</button>
       </div>
       <div class="room-row" style="margin-top:8px">
-        <button class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FEEDWATER 1 ${S.fw1?'STOP':'START'}</button>
-        <button class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FEEDWATER 2 ${S.fw2?'STOP':'START'}</button>
-        <button class="btn-sm" data-act="ops_sw" data-arg="PRZ-HTR">PRZ HEATER ${S.przHeater?'OFF':'ON'}</button>
-        <button class="btn-sm" data-act="ops_sw" data-arg="PRZ-SPRAY">PRZ SPRAY ${S.spray?'CLOSE':'OPEN'}</button>
+        <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-1P">FEEDWATER 1 ${S.fw1?'STOP':'START'}</button>
+        <button type="button" class="btn-sm" data-act="ops_sw" data-arg="FW-2P">FEEDWATER 2 ${S.fw2?'STOP':'START'}</button>
+        <button type="button" class="btn-sm" data-act="ops_sw" data-arg="PRZ-HTR">PRZ HEATER ${S.przHeater?'OFF':'ON'}</button>
+        <button type="button" class="btn-sm" data-act="ops_sw" data-arg="PRZ-SPRAY">PRZ SPRAY ${S.spray?'CLOSE':'OPEN'}</button>
+      </div>
+    </div>
+    <div class="room-sec"><h4>THE GRID</h4>
+      <div class="ops-top">
+        <div class="ops-metric ${Math.abs(S.gridHz-50)>0.2?'bad':''}"><span>FREQUENCY</span><b>${fmt(S.gridHz,3)}</b><i>Hz</i></div>
+        <div class="ops-metric"><span>DEMAND</span><b>${fmt(gridDemand(),0)}</b><i>MW</i></div>
+        <div class="ops-metric"><span>NET EXPORT</span><b>${fmt(S.genBrk?Math.max(0,S.turbLoad-S.house):0,0)}</b><i>MWe</i></div>
+        <div class="ops-metric"><span>HOUSE LOAD</span><b>${fmt(S.house,0)}</b><i>MW</i></div>
+        <div class="ops-metric"><span>DROOP</span><b>${fmt((50-S.gridHz)/50/GRID.DROOP*520,0)}</b><i>MW</i></div>
+      </div>
+      <div class="room-row" style="margin-top:8px">
+        <button class="btn-sm ${S.agc?'go':''}" data-act="agc">AGC ${S.agc?'ON':'OFF'}</button>
+        <button class="btn-sm" data-act="gov" data-arg="-2">GOV -2%</button>
+        <button class="btn-sm" data-act="gov" data-arg="2">GOV +2%</button>
+        <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt)">
+          DROOP 4 % · LOAD SHED SHEDS AT 49.0 / 48.6 / 48.2 Hz</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:calc(var(--fs)*9.5px);line-height:1.8;color:#5E6A73;margin-top:8px">
+        THE GRID DOES NOT ASK. IT SLOWS WHEN IT IS SHORT AND IT SPEEDS UP WHEN IT IS LONG.<br>
+        AGC TRIMS THE GOVERNOR TO HOLD 50.000 Hz. IT WILL NOT DO IT FOR YOU AT NIGHT.
       </div>
     </div>
     <div class="room-sec"><h4>NOTE ON THE WALL</h4>
@@ -4305,7 +4563,7 @@ const ROOM_VIEWS = {
         <div class="ops-metric"><span>GEIGER</span><b>${fmt(geiger.cps,0)}</b><i>cps</i></div>
       </div>
       <div class="room-row" style="margin-top:8px">
-        <button class="btn-sm go" data-act="decon">DECONTAMINATE</button>
+        <button type="button" class="btn-sm go" data-act="decon">DECONTAMINATE</button>
         <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt)">COVERALLS OFF, SURVEY, LOG THE DOSE, BACK IN.</span>
       </div>
     </div>
@@ -4386,7 +4644,7 @@ const ROOM_VIEWS = {
       <h4>TAG-OUT RACK</h4>
       <div class="room-row">
         <select id="tagSel">${tagOptions()}</select>
-        <button class="btn-sm warn" data-act="tagout">TAG OUT</button>
+        <button type="button" class="btn-sm warn" data-act="tagout">TAG OUT</button>
         <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt)">A TAGGED POINT READS TEST AND ITS ALARMS ARE SILENCED.</span>
       </div>
       <div class="taglist" style="margin-top:8px">${taggedList()}</div>
@@ -4395,7 +4653,7 @@ const ROOM_VIEWS = {
       <h4>JUMPER PANEL — DEFEATS ONE INTERLOCK</h4>
       <div class="room-row">
         <select id="jmpSel">${tagOptions()}</select>
-        <button class="btn-sm warn" data-act="jumper">DEFEAT INTERLOCK</button>
+        <button type="button" class="btn-sm warn" data-act="jumper">DEFEAT INTERLOCK</button>
         <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt)">LOGGED. AUDIBLE. PERMANENT.</span>
       </div>
     </div>`;
@@ -4421,7 +4679,7 @@ const ROOM_VIEWS = {
     </div>
     <div class="room-sec"><h4>BACKUP CONSOLE — ANALOG INTERFACE</h4>
       <div class="room-row">
-        <button class="btn-sm go" data-act="backup">${SH.where==='backup'?'CONSOLE IN USE':'USE BACKUP CONSOLE'}</button>
+        <button type="button" class="btn-sm go" data-act="backup">${SH.where==='backup'?'CONSOLE IN USE':'USE BACKUP CONSOLE'}</button>
         <span style="font-size:calc(var(--fs)*9px);color:var(--steel-lt);line-height:1.5">
           WORKS WITHOUT PTY-1. SWITCH AND SETPOINT VERBS ONLY — NO SIGN, NO FORCE, NO BYPASS.</span>
       </div>
@@ -4449,7 +4707,7 @@ const ROOM_VIEWS = {
           : 'Eight seconds to seal. After that you cannot leave, and the air starts counting down.'}</span>
         <div class="gauge-bar"><i id="rmSealBar" style="width:${(GAME.sealP*100).toFixed(0)}%"></i></div>
       </div>
-      <button class="btn-sm ${sealed?'':'go'}" data-act="${sealed?'unseal':'seal'}">${sealed?'UNSEAL':'SEAL HATCH'}</button>
+      <button type="button" class="btn-sm ${sealed?'':'go'}" data-act="${sealed?'unseal':'seal'}">${sealed?'UNSEAL':'SEAL HATCH'}</button>
     </div>
     <div class="room-sec"><h4>INSIDE</h4>
       <div class="room-grid">
@@ -4460,7 +4718,7 @@ const ROOM_VIEWS = {
     </div>
     <div class="room-sec"><h4>ABANDON STATION</h4>
       <div class="room-row">
-        <button class="btn-sm warn" data-act="abandon" ${sealed?'':'disabled'}>ABANDON STATION</button>
+        <button type="button" class="btn-sm warn" data-act="abandon" ${sealed?'':'disabled'}>ABANDON STATION</button>
         <span style="font-size:calc(var(--fs)*9.5px);color:var(--steel-lt);max-width:520px;line-height:1.6">
           SEALED AND INSIDE IS THE ONLY ENDING THIS ROOM OFFERS. IT IS NOT A WIN. IT IS A SURVIVAL.</span>
       </div>
@@ -4481,23 +4739,39 @@ function operateSwitch(tag, on, via){
   if (d.get()===on) return false;
   d.set(on);
   soe('SW', tag, tag+' '+(on?d.on:d.off)+(via?' /'+via:''));
-  print(tag+'  '+(on?d.on:d.off)+'  CONFIRMED'+(via?' ('+via+')':''), 'ph');
+  emit(tag+'  '+(on?d.on:d.off)+'  CONFIRMED'+(via?' ('+via+')':''), 'ph');
   audio.relay(); shake(2);
   return true;
 }
 const ROOM_ACT = {
   walk(id){ travelTo(id); },
   rodsel(i){ S.selRod = parseInt(i); renderRoomPanel(); },
+  heatup(){
+    S.heatup = !S.heatup;
+    if (S.heatup && S.sdc){ emit('SHUTDOWN COOLING IS STILL IN SERVICE. IT WILL NOT HEAT.','warn'); }
+    if (S.heatup && S.flow < 90){ emit('START BOTH COOLANT PUMPS FIRST. NO FLOW, NO HEAT-UP.','warn'); }
+    emit('HEAT-UP '+(S.heatup?'ON':'OFF')+'  ·  '+fmt(S.heatRateUp,2)+' °C/s','ph');
+    audio.relay(); renderRoomPanel();
+  },
+  heatrate(){
+    S.heatRateUp = S.heatRateUp > 0.8 ? 0.35 : 1.15;
+    emit('HEAT-UP RATE '+fmt(S.heatRateUp,2)+' °C/s'+(S.heatRateUp>0.8?' — FAST. WATCH THE STRESS.':''), S.heatRateUp>0.8?'warn':'ph');
+    audio.relay(); renderRoomPanel();
+  },
+  preheat(){
+    preheatPlant();
+    renderRoomPanel();
+  },
   decon(){
     const d = GAME.dose || 0;
     GAME.dose = 0;
-    print('DECONTAMINATED. '+fmt(d,3)+' mSv LOGGED.','ph');
+    emit('DECONTAMINATED. '+fmt(d,3)+' mSv LOGGED.','ph');
     soe('DOS','DECON', 'PERSONAL DOSE '+fmt(d,3)+' mSv LOGGED');
     audio.beep('ack'); renderRoomPanel();
   },
   backup(){
-    if (SH.where==='backup'){ SH.where='desk'; print('BACKUP CONSOLE RELEASED.','sys'); }
-    else { SH.where='backup'; print('BACKUP CONSOLE. SWITCHES AND SETPOINTS ONLY.','sys'); }
+    if (SH.where==='backup'){ SH.where='desk'; emit('BACKUP CONSOLE RELEASED.','sys'); }
+    else { SH.where='backup'; emit('BACKUP CONSOLE. SWITCHES AND SETPOINTS ONLY.','sys'); }
     updateConsoleChrome(true); renderRoomPanel();
   },
   rodmove(dv){
@@ -4510,20 +4784,20 @@ const ROOM_ACT = {
   rodset(v){
     const r = S.rods[S.selRod]; if (!r) return;
     r.target = clamp(parseFloat(v), 0, 100);
-    print('ROD '+(r.i+1)+' DRIVING TO '+fmt(r.target,0)+' %','ph');
+    emit('ROD '+(r.i+1)+' DRIVING TO '+fmt(r.target,0)+' %','ph');
     audio.relay();
   },
   rodgrp(t){
     let n = 0;
     S.rods.forEach(r=>{ if (r.type===t){ r.target = (t==='AR') ? 60 : 100; n++; } });
-    print(t+' GROUP — '+n+' RODS DRIVING','ph');
+    emit(t+' GROUP — '+n+' RODS DRIVING','ph');
     audio.relay();
   },
   az5(){
     S.rods.forEach(r=>{ r.target = 100; });
     soe('SCR','AZ-5','AZ-5 PRESSED — ALL RODS INSERTING');
-    print('','dim');
-    print('  AZ-5.  ALL 211 RODS DRIVING IN.','err');
+    emit('','dim');
+    emit('  AZ-5.  ALL 211 RODS DRIVING IN.','err');
     printToPrinter('*** AZ-5 ***');
     audio.bell(); audio.beep('crit'); shake(5);
     resetChecklist();
@@ -4545,11 +4819,12 @@ const ROOM_ACT = {
   scram(){ doScram('MANUAL SCRAM FROM THE DESK'); renderRoomPanel(); },
   sync(){ doSync(); renderRoomPanel(); },
   gov(arg){ S.turbSet = clamp(S.turbSet + parseFloat(arg), 0, 105); renderRoomPanel(); },
+  agc(){ S.agc = !S.agc; emit('AGC '+(S.agc?'ON — THE GOVERNOR IS CHASING 50 Hz':'OFF — MANUAL'),'ph'); audio.beep('ack'); renderRoomPanel(); },
   ops_sw(tag){ operateSwitch(tag, !SW[tag].get(), 'DESK'); renderRoomPanel(); },
   porv(){
     S.porvClosed = !S.porvClosed;
-    if (S.porvClosed){ print('PORV SHUT. THE RELIEF PATH IS CLOSED.','ph'); soe('SW','PORV','PORV CLOSED FROM THE PANEL'); }
-    else { print('PORV OPEN — STEAM TO THE QUENCH TANK','warn'); }
+    if (S.porvClosed){ emit('PORV SHUT. THE RELIEF PATH IS CLOSED.','ph'); soe('SW','PORV','PORV CLOSED FROM THE PANEL'); }
+    else { emit('PORV OPEN — STEAM TO THE QUENCH TANK','warn'); }
     audio.relay(); renderRoomPanel();
   },
   refuel(){
@@ -4561,15 +4836,15 @@ const ROOM_ACT = {
   close(){ $('#ovRooms').classList.remove('on'); },
   sw(tag){ if (operateSwitch(tag, !SW[tag].get(), 'HAND SWITCH')) renderRoomPanel(); },
   reset(tag){
-    if (SW[tag].get()){ print(tag+' IS ALREADY RUNNING.','dim'); return; }
+    if (SW[tag].get()){ emit(tag+' IS ALREADY RUNNING.','dim'); return; }
     if (GAME.fuses<=0){ err('31','NO RESPONSE','FUSE KIT EMPTY. NO SPARES IN THE BAY.'); return; }
     GAME.fuses--;
-    print('RESETTING '+tag+' — 2 SECONDS','warn');
+    emit('RESETTING '+tag+' — 2 SECONDS','warn');
     setTimeout(()=>{
       if (SW[tag].get()) return;
       SW[tag].set(true); S.flow=(S.rcp1?50:0)+(S.rcp2?50:0);
       soe('SW', tag, tag+' RESET FROM MAINTENANCE BAY');
-      print(tag+'  RESET AND RUNNING','ph');
+      emit(tag+'  RESET AND RUNNING','ph');
       audio.relay(); renderRoomPanel();
     }, 2000);
     renderRoomPanel();
@@ -4579,48 +4854,48 @@ const ROOM_ACT = {
     const p = PIDX[sel.value]; if (!p) return;
     p.inTest = true; p.quality='TEST'; p.state='NORMAL'; p.firstOut=false;
     soe('TAG', p.tag, p.tag+' TAGGED OUT AT THE RACK');
-    print(p.tag+'  TAGGED OUT','warn'); audio.printer(1); renderRoomPanel();
+    emit(p.tag+'  TAGGED OUT','warn'); audio.printer(1); renderRoomPanel();
   },
   untag(tag){
     const p = PIDX[tag]; if (!p) return;
     p.inTest=false; p.quality='GOOD';
     soe('TAG', p.tag, p.tag+' RETURNED TO SERVICE');
-    print(p.tag+'  RETURNED','ph'); renderRoomPanel();
+    emit(p.tag+'  RETURNED','ph'); renderRoomPanel();
   },
   jumper(){
     const sel = document.getElementById('jmpSel'); if (!sel) return;
     const tag = sel.value;
     GAME.bypassed[tag]=true;
     soe('BYP', tag, 'INTERLOCK DEFEATED AT THE JUMPER PANEL');
-    print('INTERLOCK DEFEATED: '+tag,'err');
+    emit('INTERLOCK DEFEATED: '+tag,'err');
     audio.bell(); shake(3);
   },
   dg(n){
-    if (n==='1'){ S.dg1=!S.dg1; print('DIESEL GEN 1 '+(S.dg1?'STARTING':'STOPPED'),'ph'); }
-    else { S.dg2=!S.dg2; print('DIESEL GEN 2 '+(S.dg2?'STARTING':'STOPPED'),'ph'); }
+    if (n==='1'){ S.dg1=!S.dg1; emit('DIESEL GEN 1 '+(S.dg1?'STARTING':'STOPPED'),'ph'); }
+    else { S.dg2=!S.dg2; emit('DIESEL GEN 2 '+(S.dg2?'STARTING':'STOPPED'),'ph'); }
     soe('SW','DG-'+n,'DIRECT ACCESS /POWER ROOM');
     audio.relay(); renderRoomPanel();
   },
-  tie(){ S.busTie=!S.busTie; print('BUS TIE 220-1 '+(S.busTie?'CLOSED':'OPEN'),'ph'); audio.relay(); renderRoomPanel(); },
-  batt(){ S.battChg=!S.battChg; print('BATTERY CHARGER '+(S.battChg?'ON':'OFF'),'ph'); audio.relay(); renderRoomPanel(); },
+  tie(){ S.busTie=!S.busTie; emit('BUS TIE 220-1 '+(S.busTie?'CLOSED':'OPEN'),'ph'); audio.relay(); renderRoomPanel(); },
+  batt(){ S.battChg=!S.battChg; emit('BATTERY CHARGER '+(S.battChg?'ON':'OFF'),'ph'); audio.relay(); renderRoomPanel(); },
   eccs(t){
     const k = t==='A'?'eccsA':'eccsB';
     S[k] = !S[k];
-    print('ECCS TRAIN '+t+' '+(S[k]?'STARTED':'STOPPED'),'ph');
+    emit('ECCS TRAIN '+t+' '+(S[k]?'STARTED':'STOPPED'),'ph');
     soe('SW','ECCS-'+t+'-PMP','DIRECT ACCESS /POWER ROOM');
     audio.relay(); renderRoomPanel();
   },
   seal(){
     if (GAME.bunkerSealed || GAME.sealing) return;
     GAME.sealing = true; GAME.sealP = 0;
-    print('SEALING THE HATCH — 8 SECONDS','warn');
+    emit('SEALING THE HATCH — 8 SECONDS','warn');
     audio.relay();
   },
   unseal(){
     if (!GAME.bunkerSealed) return;
-    if (GAME.meltdown){ print('THE HATCH DOES NOT OPEN. THE PRESSURE ON THE OTHER SIDE IS WRONG.','err'); return; }
+    if (GAME.meltdown){ emit('THE HATCH DOES NOT OPEN. THE PRESSURE ON THE OTHER SIDE IS WRONG.','err'); return; }
     GAME.bunkerSealed = false; GAME.sealP = 0;
-    print('HATCH UNSEALED','warn'); renderRoomPanel();
+    emit('HATCH UNSEALED','warn'); renderRoomPanel();
   },
   abandon(){
     if (!GAME.bunkerSealed) return;
@@ -4661,7 +4936,7 @@ function updateRoomLive(dt){
   if (GAME.room==='MCR' && !trip.active && !REFUEL.active){
     if (S.rt==='RBMK' && document.querySelector('.rbmk-grid')) rbmkLive();
     else renderRoomPanel();
-  } else if (GAME.room==='ANALOG' && !trip.active){
+  } else if ((GAME.room==='ANALOG' || GAME.room==='TURB') && !trip.active){
     renderRoomPanel();
   }
   const set = (id, v, bad) => { const e=document.getElementById(id); if(!e) return; e.textContent=v; if(bad!=null) e.classList.toggle('lo', bad); };
@@ -4702,7 +4977,7 @@ function v2Tick(dt){
     GAME.sealP = Math.min(1, GAME.sealP + dt/8);
     if (GAME.sealP>=1){
       GAME.sealing = false; GAME.bunkerSealed = true;
-      print('HATCH SEALED.','ph'); audio.relay(); shake(3);
+      emit('HATCH SEALED.','ph'); audio.relay(); shake(3);
       if (GAME.room==='BUNKER') renderRoomPanel();
     }
   }
@@ -4722,10 +4997,10 @@ function v2Tick(dt){
 function triggerMeltdown(){
   GAME.meltdown = true; GAME.meltdownAt = nowMs;
   audio.bell(); shake(6); audio.toneStart();
-  print('','dim');
-  print('  FUEL DAMAGE. THE CORE IS NOT BEING COOLED.','err');
-  print('  GO TO THE ESCAPE BUNKER AND SEAL THE HATCH. YOU HAVE 95 SECONDS.','warn');
-  print('  THIS IS NOT A DRILL. THIS IS NOT IN THE PROCEDURE.','dim');
+  emit('','dim');
+  emit('  FUEL DAMAGE. THE CORE IS NOT BEING COOLED.','err');
+  emit('  GO TO THE ESCAPE BUNKER AND SEAL THE HATCH. YOU HAVE 95 SECONDS.','warn');
+  emit('  THIS IS NOT A DRILL. THIS IS NOT IN THE PROCEDURE.','dim');
   soe('DMG','CORE','FUEL DAMAGE — SEVERE');
   printToPrinter('*** FUEL DAMAGE ***');
   GAME.log.push({t:plantClock(nowMs).slice(0,5), who:GAME.me, text:'FUEL DAMAGE. ABANDONING THE BOARD.'});
@@ -4750,8 +5025,8 @@ function finishBunker(){
         <div>AIR LEFT<br><span style="color:var(--paper);font-size:calc(var(--fs)*15px)">${fmt(GAME.air,0)}%</span></div>
       </div>
     </div>
-    <div class="card-ft"><button class="big-btn" id="againBtn2">RUN AGAIN</button>
-      <button class="big-btn ghost" id="titleBtn2">TITLE</button></div>
+    <div class="card-ft"><button type="button" class="big-btn" id="againBtn2">RUN AGAIN</button>
+      <button type="button" class="big-btn ghost" id="titleBtn2">TITLE</button></div>
   </div>`;
   ov.classList.add('on');
   $('#againBtn2').addEventListener('click', ()=>{ ov.classList.remove('on'); startGame(SEED, GAME.shiftLenOpt); });
@@ -4777,6 +5052,8 @@ const BOOK = [
   {t:'THE PERIOD', b:'The time for power to change by a factor of e. A period of 30 seconds doubles the power in about 21. Under 15 seconds the PERIOD tile alarms. Watch it, not the power number: by the time the number has moved, the period has already told you what it is going to do.'},
   {t:'XENON', b:'After a power reduction xenon builds for hours, peaking at about twice equilibrium, and then burns away. It is worth up to 2200 pcm, which is more than the rods can overcome. That is a poison outage: the reactor physically cannot be restarted until it decays. In this build the clock is compressed so one real minute is one plant hour.'},
   {t:'DECAY HEAT', b:'After a scram the fission stops in seconds but the fuel keeps making about 6.5 % of full power, falling slowly. It is enough to melt the core if the coolant stops. That is why the pumps matter more than the rods after a trip.'},
+  {t:'THE GRID', b:'The turbine hall shows the system frequency, the demand, your net export and your droop response. The grid is a machine with inertia: a shortfall makes the frequency fall, and the governor picks up load as it does — 4 per cent droop, about 26 MW for every 0.1 Hz. The daily demand curve runs one full day every eight minutes, so the load moves under you. Hold 50 Hz with the governor, or switch AGC on and let the governor chase it. Below 49.0 Hz the system starts shedding load in stages; below 47 Hz it goes black.'},
+  {t:'THE FUEL CYCLE', b:'Channels burn as the reactor runs, and burnt fuel is negative reactivity: about 2500 pcm across the core from 45 to 65 per cent burnup. Refuelling pays it back eight bundles at a time. Central channels are worth more than peripheral ones, so refuel those first. Each refuel pushes fresh fuel one way and alternates the direction next time — refuel the same way repeatedly and the flux tilts, the axial offset alarm goes off, and the machine will not let you refuel past 9 per cent until it flattens.'},
   {t:'THE SURVEY METER', b:'A geiger counter in the header, and it is not decoration. Its click rate is the dose rate where you are standing: the main control room is clean, the refuelling bay is not, and anything the core releases gets added to it. The dot flashes on every pulse. Above 0.5 mSv/h the badge turns red. Turn it off in Settings if the clicking gets to you — in NIGHT SHIFT it does not always stop when you do.'},
   {t:'A SCRAM', b:'All shutoff rods drop in about two seconds, the turbine trips, and the checklist resets. You do not get to un-scram: you go back to hot standby and start again.'}
 ]},
@@ -4797,7 +5074,9 @@ const BOOK = [
 ]},
 
 {id:'startup', label:'STARTUP', entries:[
-  {t:'THE SEQUENCE', b:'Hot standby to full power, in order. The desk keeps score: <em>dilute boron</em> to about 560 ppm, <em>withdraw the regulating rods</em> until the reactivity meter crosses zero, hold a period of 30–60 seconds, raise power to 5–15 %, start feedwater, <em>open the MSIV</em>, roll the turbine to 3000 rpm, <em>close 52-G1</em>, then raise the setpoint and let the load follow.'},
+  {t:'SIX PHASES, COLD TO GRID', b:'The simulator starts cold: 60 °C, 20 bar, shutdown cooling in service, rods in, boron 1100 ppm. <em>Phase 1</em> is the margin — boron above 1000, rods fully in, cooling in service, primary below 80 °C. <em>Phase 2</em> is circulation — both coolant pumps, then isolate shutdown cooling. <em>Phase 3</em> is heat-up. <em>Phase 4</em> is pressurisation to 145 bar. <em>Phase 5</em> is criticality. <em>Phase 6</em> is the turbine and the grid.'},
+  {t:'HEAT-UP', b:'HEAT-UP on the desk brings the loop up at 0.35 °C/s, or 1.15 °C/s on FAST. It only works with both pumps running and shutdown cooling isolated — no flow, no heat. Fast heat-up accumulates <em>stress</em> in the pressure tubes; at 60 per cent the tubes crack and you get a hot-leg leak you did not ask for. SLOW costs a few more minutes and nothing else.'},
+  {t:'WHY IT IS NOT PREHEATED', b:'Because the heat-up is half the procedure and it is where the mistakes are. If you do not want it, PREHEAT on the desk puts the plant at 290 °C and 152 bar in one press and the checklist resumes at circulation. That is the only shortcut in the game that is not a mistake.'},
   {t:'APPROACH TO CRITICAL', b:'Never pull rods in a hurry. Step them in 1 % increments, wait for the period to settle, and read the reactivity meter between steps. If the period goes short, push the rods straight back in — the meter tells you before the power does.'},
   {t:'ROLLING THE TURBINE', b:'With the MSIV open the turbine accelerates against steam pressure and holds 3000 rpm on the governor. Below about 15 bar it will not roll. Closing 52-G1 below 2900 rpm is refused; above it, the machine locks to the grid at 50 Hz.'},
   {t:'LOADING', b:'The governor setpoint caps the load, and the load cannot exceed what the reactor is making. Raise the power setpoint first and let the machine follow. Watch the steam generator pressure: if it falls under 20 bar with load on, the turbine trips.'},
@@ -4950,11 +5229,11 @@ function renderBook(){
       <h2>QUICK REFERENCE</h2>
       <span style="font-size:calc(var(--fs)*9px);letter-spacing:.16em;color:var(--steel-lt)">SECOND SHIFT · REV 4.2</span>
       <div class="book-search"><input id="bookQ" placeholder="SEARCH — try 'E23', 'bunker', 'ack'" value="${bookQ.replace(/"/g,'&quot;')}"></div>
-      <button class="hbtn" id="bookClose">CLOSE</button>
+      <button type="button" class="hbtn" id="bookClose">CLOSE</button>
     </div>
     <div class="book-body">
       <div class="book-nav" id="bookNav">
-        ${BOOK.map(s=>`<button data-sec="${s.id}" class="${bookSec===s.id&&!bookQ?'on':''}">${s.label}</button>`).join('')}
+        ${BOOK.map(s=>`<button type="button" data-sec="${s.id}" class="${bookSec===s.id&&!bookQ?'on':''}">${s.label}</button>`).join('')}
       </div>
       <div class="book-main" id="bookMain"></div>
     </div>
@@ -5004,8 +5283,8 @@ function renderBookBody(){
    19. SCENARIOS — the frame the future content plugs into
    ============================================================ */
 const SCENARIOS = [
-  {id:'KAVERI', name:'KAVERI DELTA 1998', status:'PLAYABLE', plant:'hotstandby',
-   note:'540 MWe PHWR. Hot standby to full power: criticality, boron, xenon, on-power refuelling.'},
+  {id:'KAVERI', name:'KAVERI DELTA 1998', status:'PLAYABLE', plant:'cold',
+   note:'540 MWe PHWR from cold shutdown: pumps, heat-up, pressurisation, criticality, turbine, load.'},
   {id:'UNIT4', name:'UNIT 4 · RBMK 1986', status:'PLAYABLE', plant:'rbmk1986',
    note:'Channel-type RBMK at 200 MWt with the rods nearly out and the ORM at 8. 211 rods, individual control, positive void coefficient.'},
   {id:'TMI', name:'TMI · 1979', status:'LOCKED',
@@ -5016,7 +5295,7 @@ const SCENARIOS = [
 function renderScenarioChips(){
   const row = document.getElementById('scenRow');
   if (!row) return;
-  row.innerHTML = SCENARIOS.map(s=>`<button class="chip ${(GAME.scenario||'KAVERI')===s.id?'on':''}" data-scen="${s.id}">
+  row.innerHTML = SCENARIOS.map(s=>`<button type="button" class="chip ${(GAME.scenario||'KAVERI')===s.id?'on':''}" data-scen="${s.id}">
     ${s.name}${s.status==='PLAYABLE'?'':' · LOCKED'}</button>`).join('');
   row.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
     const s = SCENARIOS.find(x=>x.id===b.dataset.scen);
@@ -5108,7 +5387,7 @@ const STORY = {
       if (t > 12 && S.corePower > 5 && !GAME.tmiTripped){
         GAME.tmiTripped = true;
         S.scram = true; S.rodTarget = 0; S.genBrk = false; S.fw1 = false; S.fw2 = false;
-        print('','dim'); print('  FEEDWATER TRIP. REACTOR SCRAM.','err');
+        emit('','dim'); emit('  FEEDWATER TRIP. REACTOR SCRAM.','err');
         audio.beep('crit'); audio.sirenStart();
       }
       if (S.coreDamage > 70) return 'lose';
@@ -5147,7 +5426,7 @@ const STORY = {
       if (S.coreDamage > 65) return 'lose';
       if (t > 20 && S.dcBus < 180 && !GAME.fukDead){
         GAME.fukDead = true;
-        print('  THE DC BUS IS GONE. NO INSTRUMENTS, NO VALVES.','err');
+        emit('  THE DC BUS IS GONE. NO INSTRUMENTS, NO VALVES.','err');
       }
       if (S.eccsA || S.eccsB){
         if (S.tavg < 220 && S.coreDamage < 30 && t > 60) return 'win';
@@ -5196,7 +5475,7 @@ function showChapters(){
   const ov = $('#ovChapters');
   const list = Object.keys(STORY).map(k=>{
     const c = STORY[k];
-    return `<button class="chapter" data-ch="${k}">
+    return `<button type="button" class="chapter" data-ch="${k}">
       <div class="ch-year">${c.year} · ${c.place}</div>
       <div class="ch-title">${c.title}</div>
       <div class="ch-tag">${c.tag}</div>
@@ -5207,7 +5486,7 @@ function showChapters(){
     <div class="chapters-hd">
       <h2>FOUR NIGHTS</h2>
       <span class="sub">STORIES FROM THE RECORD</span>
-      <button class="hbtn" id="chClose">CLOSE</button>
+      <button type="button" class="hbtn" id="chClose">CLOSE</button>
     </div>
     <div class="chapters-bd">${list}</div>
     <div class="chapters-ft">These are dramatised reconstructions of real accidents, on a simplified machine.
@@ -5235,11 +5514,11 @@ function startStory(id){
   GAME.running = true;
   $('#objBar').classList.remove('hidden');
   $('#objTxt').textContent = c.objective;
-  print('','dim');
-  print('=== '+c.title.toUpperCase()+' · '+c.year+' =========================','ph');
-  c.brief.forEach(l=>print(l,'dim'));
-  print('','dim');
-  print('OBJECTIVE: '+c.objective,'warn');
+  emit('','dim');
+  emit('=== '+c.title.toUpperCase()+' · '+c.year+' =========================','ph');
+  c.brief.forEach(l=>emit(l,'dim'));
+  emit('','dim');
+  emit('OBJECTIVE: '+c.objective,'warn');
   audio.beep('warn');
   resetChecklist();
 }
@@ -5284,9 +5563,9 @@ function endStory(result){
       </div>
     </div>
     <div class="card-ft">
-      <button class="big-btn" id="chAgain">TRY AGAIN</button>
-      <button class="big-btn ghost" id="chList">OTHER NIGHTS</button>
-      <button class="big-btn ghost" id="chTitle">TITLE</button>
+      <button type="button" class="big-btn" id="chAgain">TRY AGAIN</button>
+      <button type="button" class="big-btn ghost" id="chList">OTHER NIGHTS</button>
+      <button type="button" class="big-btn ghost" id="chTitle">TITLE</button>
     </div>
   </div>`;
   ov.classList.add('on');
@@ -5329,7 +5608,7 @@ function frame(ts){
       GAME.room = 'MCR'; SH.where = 'desk';
       $('#ovRooms').classList.remove('on');
       updateConsoleChrome(true);
-      print('THE DOSE MONITOR IN THE COMPUTER ROOM TRIPS. YOU ARE OUT OF THERE.','err');
+      emit('THE DOSE MONITOR IN THE COMPUTER ROOM TRIPS. YOU ARE OUT OF THERE.','err');
       audio.beep('crit'); audio.sirenStart();
     }
     /* emergency siren: scram, fuel damage, or a containment release */
