@@ -5,17 +5,28 @@
 You are a licensed reactor operator on the night shift at a fictional coastal nuclear station. Every consequential action passes through a keypad: type a command, inspect its echo, and execute it. Run the plant, watch the instruments, and decide what to do as the shift unfolds.
 
 [![Play in browser](https://img.shields.io/badge/Play-Second%20Shift-8B5CF6?style=for-the-badge)](index.html)
+[![Desktop releases](https://img.shields.io/badge/Download-Desktop%20Releases-2563EB?style=for-the-badge)](https://github.com/goldenration77/second-shift/releases/latest)
 [![Single-file game](https://img.shields.io/badge/Format-Single%20HTML%20file-22C55E?style=for-the-badge)](index.html)
 [![No install required](https://img.shields.io/badge/Setup-No%20install%20needed-FF8C00?style=for-the-badge)](index.html)
 [![License](https://img.shields.io/badge/License-GPLv3-DC2626?style=for-the-badge)](LICENSE)
 
-The game is a self-contained HTML document: no build step, dependencies, or network access are needed to play. Open `index.html` in a modern browser, or [play the published version](https://goldenration77.github.io/second-shift/).
+Play in a modern browser with the self-contained `index.html` file, or download a packaged desktop build from the [latest release](https://github.com/goldenration77/second-shift/releases/latest). The published browser version is also available [here](https://goldenration77.github.io/second-shift/).
+
+## Releases
+
+Desktop builds are available on the [GitHub Releases page](https://github.com/goldenration77/second-shift/releases). The latest release includes:
+
+- **Windows:** `.msi` installer
+- **macOS:** `.dmg` disk image
+- **Linux:** `.deb` package and `.AppImage`
+
+Visit the releases page for the latest version, downloads, and changelog.
 
 ## Recent updates
 
 - The browser game is now served from `index.html` (replacing the old `Second_Shift.html` entry point); the play and setup links here point to the current file.
 - GitHub Pages asset URLs for the app icons and web-app manifest now include the repository’s `/second-shift/` path, so those resources resolve correctly when hosted as a project site.
-- The desktop-app build workflow now uses the published `index.html` URL.
+- The desktop-app build workflow now uses the published `index.html` URL and publishes platform-specific release downloads.
 
 ## Screenshots
 
