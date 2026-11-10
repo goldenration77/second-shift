@@ -4,7 +4,7 @@
 
 You are a licensed reactor operator on the night shift at a fictional coastal nuclear station. Every consequential action passes through a keypad: type a command, inspect its echo, and execute it. Run the plant, watch the instruments, and decide what to do as the shift unfolds.
 
-[![Play in browser](https://img.shields.io/badge/Play-Second%20Shift-8B5CF6?style=for-the-badge)](index.html)
+[![Play in browser](https://img.shields.io/badge/Play-Second%20Shift-8B5CF6?style=for-the-badge)](https://goldenration77.github.io/second-shift/)
 [![Desktop releases](https://img.shields.io/badge/Download-Desktop%20Releases-2563EB?style=for-the-badge)](https://github.com/goldenration77/second-shift/releases/latest)
 [![Single-file game](https://img.shields.io/badge/Format-Single%20HTML%20file-22C55E?style=for-the-badge)](index.html)
 [![License](https://img.shields.io/badge/License-GPLv3-DC2626?style=for-the-badge)](LICENSE)
