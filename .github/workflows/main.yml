@@ -65,7 +65,7 @@ jobs:
       - name: Build App
         shell: bash
         run: |
-          pake "https://goldenration77.github.io/second-shift/Second_Shift.html" --name "Second-Shift-Prologue" --width 1600 --height 900
+          pake "https://goldenration77.github.io/second-shift/index.html" --name "Second-Shift-Prologue" --width 1600 --height 900
 
       - name: Package release files
         shell: bash
